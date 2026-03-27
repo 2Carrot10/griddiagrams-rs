@@ -3,9 +3,56 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::iter;
 
+use serde::{Deserialize, Deserializer};
+
 pub type GridNotation = Vec<Vec<i32>>;
-pub struct GridNotationContainer(GridNotation);
+
+#[derive(Debug, Clone)]
+pub struct GridNotationContainer(pub GridNotation);
 pub type GridList = Vec<i32>;
+impl<'de> Deserialize<'de> for GridNotationContainer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        let s = s.trim();
+
+        if !s.starts_with('[') || !s.ends_with(']') {
+            panic!("missing outer brackets");
+        }
+
+        let inner = &s[1..s.len() - 1];
+
+        let mut result = Vec::new();
+
+        for chunk in inner.split("];") {
+            let chunk = chunk
+                .trim()
+                .trim_start_matches('[')
+                .trim_end_matches(']');
+
+            if chunk.is_empty() {
+                continue;
+            }
+
+            let mut row = Vec::new();
+
+            for num in chunk.split(';') {
+                let val = num
+                    .trim()
+                    .parse::<i32>()
+                    .map_err(|_| panic!("missing outer brackets"))?;
+                row.push(val);
+            }
+
+            result.push(row);
+        }
+
+        Ok(GridNotationContainer(result))
+    }
+}
 
 // Either VertList or HorzList
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -139,16 +186,15 @@ pub fn vlist(gridlist: GridList) -> DirList {
     extended_grid.push(gridlist[0]);
 
     let n = extended_grid.len();
-    extended_grid.push(gridlist[0]);
 
-    let mut x = n + 1;
+    let mut x = n as i32 + 1;
     let mut vsegments = vec![None; 2 * n + 1];
-    vsegments[x] = Some((extended_grid[1], extended_grid[2]));
+    vsegments[x as usize] = Some((extended_grid[0], extended_grid[2]));
 
     for i in (2..extended_grid.len() - 2).step_by(2) {
-        x = x + (extended_grid[i + 1] as usize - extended_grid[i - 1] as usize);
-        if 0 <= x && x < vsegments.len() {
-            vsegments[x] = Some((extended_grid[i], extended_grid[i + 2]));
+        x = x + (extended_grid[i + 1] - extended_grid[i - 1]);
+        if (x as usize) < vsegments.len() {
+            vsegments[x as usize] = Some((extended_grid[i], extended_grid[i + 2]));
         } else {
             panic!("Calculated index is out of bounds!");
         }
@@ -212,16 +258,9 @@ pub fn c_move(input_list: DirList) -> Vec<DirList> {
     let mut result = vec![];
     let mut seen = HashSet::new();
 
-    let mut n = input_list.0.len();
+    let n = input_list.0.len();
 
-    // fn add_to_result(lst: Vec<(i32, i32)>) {
-    //     if seen.contains(tpl) {
-    //         seen.insert(lst);
-    //         result.append(lst);
-    //     }
-    // }
-
-    for i in 0..n {
+    for i in 0..(n-1) {
         if can_commute(input_list.0[i], input_list.0[i + 1]) {
             let mut swapped_list = input_list.clone();
             let a = swapped_list.0[i + 1];
@@ -229,7 +268,7 @@ pub fn c_move(input_list: DirList) -> Vec<DirList> {
             swapped_list.0[i] = a;
             swapped_list.0[i + 1] = b;
 
-            if seen.contains(&swapped_list.0) {
+            if !seen.contains(&swapped_list.0) {
                 seen.insert(swapped_list.0.clone());
                 result.push(swapped_list.clone());
             }
@@ -245,7 +284,7 @@ pub fn c_move(input_list: DirList) -> Vec<DirList> {
         let index = swapped_list.0.len() - 1;
         swapped_list.0[index] = b;
 
-        if seen.contains(&swapped_list.0) {
+        if !seen.contains(&swapped_list.0) {
             seen.insert(swapped_list.0.clone());
             result.push(swapped_list.clone());
         }
@@ -288,10 +327,11 @@ pub fn knot_commute(vertlist: DirList) -> HashSet<DirList> {
 /// The winding number increases by 1 when crossing an upward segment
 /// and decreases by 1 when crossing a downward segment.
 pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
+    println!("{}",&vertlist);
     let size = vertlist.0.len();
     let mut result = vec![];
     for i in 0..size {
-        let mut row: Vec<i32> = vec![];
+        let mut row: Vec<i32> = vec![0];
         for j in 0..(size - 1) {
             let (tail, head) = vertlist.0[j];
 
@@ -446,6 +486,8 @@ pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
 /// This function tries both the original and reversed orientation,
 /// checking for both horizontal and vertical perfect grid states.
 pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
+    return None; // TODO:
+
     //(DirList, String, Permutation, WindingMatrix, i32)
     // Does not attempt reversed
     fn try_instance_permutations(vertlist: DirList) -> Option<SearchRecord> {
@@ -556,13 +598,13 @@ pub fn gridstate_finder_commute(vertlist: DirList, n: i32) -> Option<SearchRecor
     _gridstate_finder_commute_with_visited(vertlist, n, HashSet::new())
 }
 
-struct SearchRecord {
+pub struct SearchRecord {
     stabilizations: i32,
     vlist: DirList,
     matrix: WindingMatrix,
     gridstate: Permutation,
     perm_type: String,
-    alexander_grading i32,
+    alexander_grading: i32,
 }
 
 /// Helper function: gridstate_finder_commute that respects a global visited set.
@@ -578,10 +620,13 @@ pub fn _gridstate_finder_commute_with_visited(
 
     let mut current_states = HashSet::from([vertlist]);
     for _ in 0..n {
+
+        println!("Size of the frontier with visited: {}", current_states.len());
         let mut new_states = HashSet::new();
 
         for state in &current_states {
-            for commuted in knot_commute(state.clone()) {
+            let commute = knot_commute(state.clone());
+            for commuted in commute {
                 if !global_visited.contains(&commuted) {
                     global_visited.insert(commuted.clone());
 
@@ -687,7 +732,7 @@ impl Display for DirList {
                 } else if i == max(x, o) {
                     print!(
                         "{}",
-                        if downward_lines[min(x, o) as usize] {
+                        if downward_lines[max(x, o) as usize] {
                             "╯"
                         } else {
                             "╮"
@@ -704,6 +749,7 @@ impl Display for DirList {
                     }
                 }
             }
+            println!();
         }
 
         std::fmt::Result::Ok(())
@@ -725,6 +771,7 @@ impl std::fmt::Debug for DirList {
                     .take(hlen - (max(x, o) - 1) as usize)
                     .collect::<String>()
             );
+            println!();
         }
 
         std::fmt::Result::Ok(())

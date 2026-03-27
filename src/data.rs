@@ -4,21 +4,28 @@ use serde;
 use crate::search_core::{gridnotation_to_gridlist, vlist, DirList, GridNotation, GridNotationContainer};
 type Csv = Vec<Record>;
 
+pub const RAW_CSV: &str = include_str!("../data/knotinfo.csv");
+
+
 #[derive(Debug, serde::Deserialize)]
-struct Record {
-    city: String,
-    region: String,
-    name: String,
-    fibered: String, // Should be Y or N (all of this dataset are N)
-    crossing_number: i32,
-    genus_3d: i32,
-    arc_index: i32,
-    gridnotation: GridNotation,
-    country: Option<u64>,
+pub struct Record {
+    #[serde(alias = "Name")]
+    pub name: String,
+    #[serde(alias = "Fibered")]
+    pub fibered: String, // Should be Y or N (all of the default dataset are Y, obviously)
+
+    #[serde(alias = "Crossing Number")]
+    pub crossing_number: i32,
+    #[serde(alias = "Genus-3D")]
+    pub genus_3d: i32,
+    #[serde(alias = "Arc Index")]
+    pub arc_index: i32,
+    #[serde(alias = "Grid Notation")]
+    pub gridnotation: GridNotationContainer,
 }
 
-pub fn load_knot_data(path: String) -> Vec<Record> {
-    let mut rdr = csv::Reader::from_path(path).expect("Could not read csv");
+pub fn load_knot_data() -> Vec<Record> {
+    let mut rdr = csv::Reader::from_reader(RAW_CSV.as_bytes());
     let mut csv = vec![];
 
     for result in rdr.deserialize() {
@@ -35,7 +42,7 @@ pub fn get_all_knot_names(records: &Csv) -> Vec<String> {
 
 pub fn get_grid_notation(name: String, csv: &Csv) -> GridNotation {
     csv.iter().find(|elem| elem.name == name).expect("Could not find name.")
-    .gridnotation.clone()
+    .gridnotation.0.clone()
 }
 
 pub fn get_vlist_by_name(name: String, csv: &Csv) -> DirList {
