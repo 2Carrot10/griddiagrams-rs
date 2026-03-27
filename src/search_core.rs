@@ -625,9 +625,9 @@ pub fn _gridstate_finder_commute_with_visited(
 
         print!("Size of the frontier: {:<10}", current_states.len());
         let ratio = (current_states.len() as f32) / (previous_states_len as f32);
-        print!("Ratio change: {:.2}%", 100.0 * ratio);
         let format_blocks = min(30, (ratio * 10.0) as usize);
-        println!("  [{}{}]", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
+        print!("  [{}{}]  ", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
+        println!("Ratio change: {:.2}%", 100.0 * ratio);
         previous_states_len = current_states.len();
         let mut new_states = HashSet::new();
 
