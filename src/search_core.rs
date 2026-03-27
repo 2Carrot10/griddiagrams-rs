@@ -621,18 +621,23 @@ pub fn _gridstate_finder_commute_with_visited(
 
     let mut current_states = HashSet::from([vertlist]);
     let mut previous_states_len = current_states.len();
+    let mut commutations_num = vec![];
     for _ in 0..n {
+
 
         print!("Size of the frontier: {:<10}", current_states.len());
         let ratio = (current_states.len() as f32) / (previous_states_len as f32);
         let format_blocks = min(30, (ratio * 10.0) as usize);
+        print!("Average commutations: {}", commutations_num.iter().sum::<i32>() / commutations_num.len() as i32);
         print!("  [{}{}]  ", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
         println!("Ratio change: {:.2}%", 100.0 * ratio);
+        commutations_num = vec![];
         previous_states_len = current_states.len();
         let mut new_states = HashSet::new();
 
         for state in &current_states {
             let commuted_states = knot_commute(state.clone());
+            commutations_num.push(commuted_states.len() as i32);
             for commuted in commuted_states {
                 if !global_visited.contains(&commuted) {
                     global_visited.insert(commuted.clone());
