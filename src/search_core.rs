@@ -625,8 +625,8 @@ pub fn _gridstate_finder_commute_with_visited(
         let mut new_states = HashSet::new();
 
         for state in &current_states {
-            let commute = knot_commute(state.clone());
-            for commuted in commute {
+            let commuted_states = knot_commute(state.clone());
+            for commuted in commuted_states {
                 if !global_visited.contains(&commuted) {
                     global_visited.insert(commuted.clone());
 
@@ -634,12 +634,12 @@ pub fn _gridstate_finder_commute_with_visited(
                     if let Some(record) = perm_result {
                         return Some(record);
                     }
+                    new_states.insert(commuted);
                 }
-                new_states.insert(commuted);
             }
         }
         current_states = new_states.clone();
-        if current_states.capacity() == 0 {
+        if current_states.is_empty() {
             break;
         }
     }
@@ -649,7 +649,7 @@ pub fn _gridstate_finder_commute_with_visited(
 pub fn gridstate_finder_stab(vertlist: DirList, n: i32) -> Option<SearchRecord> {
     let global_visited = HashSet::new();
     for segment in vertlist.0.clone() {
-        for (index, dir) in STAB_COMBINATIONS {
+        for (index, dir) in [(0, StabDir::NorthWest)] /* STAB_COMBINATIONS */ {
             let stab_vertlist = stabilize(vertlist.clone(), segment, dir, index);
             // Skip if we've seen this stabilized state before
             if global_visited.contains(&stab_vertlist) {
@@ -682,7 +682,7 @@ pub fn stabilize(
     let is_north = direction.is_north();
     let is_west = direction.is_west();
 
-    if vertlist.0.contains(&loc) {
+    if !vertlist.0.contains(&loc) {
         let l0 = loc.0;
         let l1 = loc.1;
         panic!("Segment ({l0},{l1}) not in vertical list");
@@ -692,9 +692,8 @@ pub fn stabilize(
     let loc = [loc.0, loc.1];
     let mut temp: Vec<[i32; 2]> = vertlist.0.iter().map(|(a, b)| [*a, *b]).collect();
 
-    let templen = temp.len();
     for segment in &mut temp {
-        for j in 0..templen {
+        for j in 0..segment.len() {
             if segment[j] > loc[tuple_index] || (!is_north && segment[j] >= loc[tuple_index]) {
                 segment[j] += 1;
             }
