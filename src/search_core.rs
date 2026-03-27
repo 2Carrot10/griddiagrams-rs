@@ -623,8 +623,11 @@ pub fn _gridstate_finder_commute_with_visited(
     let mut previous_states_len = current_states.len();
     for _ in 0..n {
 
-        print!("Size of the frontier: {:10}", current_states.len());
-        println!("Ratio change: {:.2}%", 100.0 * (current_states.len() as f32) / (previous_states_len as f32));
+        print!("Size of the frontier: {:<10}", current_states.len());
+        let ratio = (current_states.len() as f32) / (previous_states_len as f32);
+        print!("Ratio change: {:.2}%", 100.0 * ratio);
+        let format_blocks = min(30, (ratio * 10.0) as usize);
+        println!("  [{}{}]", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
         previous_states_len = current_states.len();
         let mut new_states = HashSet::new();
 
@@ -644,6 +647,7 @@ pub fn _gridstate_finder_commute_with_visited(
         }
         current_states = new_states.clone();
         if current_states.is_empty() {
+            print!("Zero current states");
             break;
         }
     }
@@ -661,7 +665,7 @@ pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32) -> Option<
             }
 
             let result =
-                _gridstate_finder_commute_with_visited(stab_vertlist, n, global_visited.clone());
+                _gridstate_finder_commute_with_visited(stab_vertlist, n, threads, global_visited.clone());
 
             if let Some(mut record) = result {
                 record.stabilizations = 1;

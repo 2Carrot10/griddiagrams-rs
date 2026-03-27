@@ -25,9 +25,9 @@ struct Args {
     output_dir: String,
 
     /// Which knots to target. Value must be "all", "unsolved", or knot name separated by commas
-    /// (such as 12n_79, 12n_168, 13n_282, 13n_917)
+    /// (i.e. 12n_79, 12n_168, 13n_282, 13n_917)
     #[arg(short, long, default_value_t = String::from("unsolved"))]
-    target_knots: String,
+    knots: String,
 
     /// stab or commute
     #[arg(short, long, default_value_t = String::from("stab"))]
@@ -44,7 +44,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let csv = load_knot_data();
-    let knot_names = match args.target_knots.as_str() {
+    let knot_names = match args.knots.as_str() {
         "unsolved" => UNSOLVED_KNOT_NAMES.to_vec().into_iter().map(|a| a.to_string()).collect(),
         "all" => get_all_knot_names(&csv),
         names => names.split(",").map(|a| a.trim().to_string()).collect(),
@@ -56,8 +56,8 @@ fn main() {
         println!("*** {}", knot);
         println!("{}", vertlist);
         match args.algorithm.as_str() {
-            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth),
-            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth),
+            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, args.threads),
+            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, args.threads),
             _ => panic!("Could not read algorithm type")
         };
     }
