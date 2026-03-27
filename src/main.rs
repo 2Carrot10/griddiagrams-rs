@@ -16,6 +16,13 @@ enum StabDir {
     NorthEast,
     SouthEast,
 }
+
+const STAB_COMBINATIONS: [(usize, StabDir); 8] = [(0, StabDir::NorthWest), (1, StabDir::NorthWest),
+    (0, StabDir::NorthEast), (1, StabDir::NorthEast),
+    (0, StabDir::SouthWest), (1, StabDir::SouthWest),
+    (0, StabDir::SouthEast), (1, StabDir::SouthEast)
+];
+
 impl StabDir {
     fn is_north(&self) -> bool {
         match self {
@@ -304,6 +311,11 @@ fn w_matrix(vertlist: DirList) -> WindingMatrix {
 
 fn h_type_0_permutation(matrix: WindingMatrix) -> Result<Permutation, String> {
     todo!()
+    // let n = matrix.len();
+    // let min_indices = [];
+    // while min_indices.iter().any() {
+    //     let singleton_index = ..
+    // }
 }
 
 fn v_type_0_permutation(matrix: WindingMatrix) -> Result<Permutation, String> {
@@ -325,31 +337,102 @@ fn rev(input_list: DirList) -> DirList {
     DirList(input_list.0.into_iter().map(|(a, b)| (b, a)).collect())
 }
 
-fn a_grading(vertlist: DirList, matrix: WindingMatrix, permutation: Permutation) -> i32 {
+/// Calculate the Alexander grading for a grid state.
+/// 
+/// Parameters
+/// ----------
+/// vertlist : List[Tuple[int, int]]
+///     Vertical segment list.
+/// matrix : np.ndarray
+///     Winding matrix.
+/// permutation : List[int]
+///     Permutation representing the grid state.
+/// 
+/// Returns
+/// -------
+/// int
+///     Alexander grading of the grid state.
+fn a_grading(
+    vertlist: &DirList,
+    matrix: &WindingMatrix,
+    permutation: &Permutation,
+) -> i32 {
     let n = vertlist.0.len();
-    let m = (n - 1) / 2;
+    let m = ((n - 1) / 2) as i32;
 
-    let mut a_sum = 0;
-    for tpl in &vertlist.0 {
-        let col = vertlist.0.iter().position(|r| r == tpl).unwrap();
-        let upper_row = min(tpl.0, tpl.1);
-        let lower_row = max(tpl.0, tpl.1);
+    let last_col = n - 1;
 
-        if upper_row == 0
-            && col
-                != vertlist.0
-                    .iter()
-                    .position(|&r| r == vertlist.0[vertlist.0.len() - 1])
-                    .unwrap()
-        {
-            let upper_sum = matrix[0][col] + matrix[0][col + 1];
+    let mut a_sum: i32 = 0;
+
+    for (col, tpl) in vertlist.0.iter().enumerate() {
+        let upper_row = tpl.0.min(tpl.1) as usize;
+        let lower_row = tpl.0.max(tpl.1) as usize;
+
+        let upper_sum: i32;
+        if upper_row == 0 && col != last_col {
+            upper_sum = matrix[0][col] + matrix[0][col + 1];
+        } else if upper_row != 0 && col != last_col {
+            upper_sum =
+                matrix[upper_row - 1][col]
+                + matrix[upper_row - 1][col + 1]
+                + matrix[upper_row][col]
+                + matrix[upper_row][col + 1];
+        } else if upper_row == 0 && col == last_col {
+            upper_sum = matrix[0][col];
+        } else {
+            // upper_row != 0 && col == last_col
+            upper_sum =
+                matrix[upper_row - 1][col]
+                + matrix[upper_row][col];
         }
+
+        let lower_sum: i32;
+        if col != last_col {
+            lower_sum =
+                matrix[lower_row - 1][col]
+                + matrix[lower_row - 1][col + 1]
+                + matrix[lower_row][col]
+                + matrix[lower_row][col + 1];
+        } else {
+            lower_sum =
+                matrix[lower_row - 1][col]
+                + matrix[lower_row][col];
+        }
+
+        a_sum += upper_sum + lower_sum;
     }
-    todo!()
+
+    // integer division (same semantics as Python int(...) after float)
+    a_sum /= 8;
+
+    let mut w_sum: i32 = 0;
+
+    for (j, &i) in permutation.iter().enumerate() {
+        w_sum += matrix[j][i as usize];
+    }
+
+    -w_sum + a_sum - m
 }
 
+/// Convert vertical permutation to horizontal permutation.
+/// 
+/// Parameters
+/// ----------
+/// vperm : List[int]
+///     Vertical permutation.
+/// 
+/// Note
+/// -----
+/// This is only used to have all found grid states in the same format
+/// 
+/// Returns
+/// -------
+/// List[int]
+///     Horizontal permutation.
 fn vperm_to_hperm(vperm: Permutation) -> Permutation {
-    todo!()
+    let mut indexed_perm: Vec<(i32, i32)> = (0..vperm.len()).map(|i| (vperm[i], i as i32)).collect();
+    indexed_perm.sort_by_key(|a| a.0);
+    indexed_perm.iter().map(|(_, index)| *index).collect()
 }
 
 /// Try to find a unique perfect grid state for a diagram.
@@ -370,12 +453,12 @@ fn vperm_to_hperm(vperm: Permutation) -> Permutation {
 /// This function tries both the original and reversed orientation,
 /// checking for both horizontal and vertical perfect grid states.
 fn try_permutations(
-    vertlist: DirList,
-) -> Option<(DirList, String, Permutation, WindingMatrix, i32)> {
+    vertlist: &DirList,
+) -> Option<SearchRecord> { //(DirList, String, Permutation, WindingMatrix, i32)
     // Does not attempt reversed
     fn try_instance_permutations(
         vertlist: DirList,
-    ) -> Option<(DirList, String, Permutation, WindingMatrix, i32)> {
+    ) -> Option<SearchRecord> {
         let matrix = w_matrix(vertlist.clone());
         let rowsum = matrix
             .clone()
@@ -390,25 +473,29 @@ fn try_permutations(
 
         if rowsum >= colsum {
             if let Ok(h_perm) = h_type_0_permutation(matrix.clone()) {
-                return Some((
-                    vertlist.clone(),
-                    String::from("h_type_0"),
-                    h_perm.clone(),
-                    matrix.clone(),
-                    a_grading(vertlist, matrix, h_perm),
-                ));
+                return Some(SearchRecord { 
+                    stabilizations: 0,
+                    vlist: vertlist.clone(),
+                    alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
+                    matrix: matrix.clone(),
+                    gridstate: h_perm.clone(),
+                    perm_type: String::from("h_type_0"),
+
+                });
             }
         }
 
         if colsum >= rowsum {
             if let Ok(v_perm) = v_type_0_permutation(matrix.clone()) {
-                return Some((
-                    vertlist.clone(),
-                    String::from("v_type_0"),
-                    v_perm.clone(),
-                    matrix.clone(),
-                    a_grading(vertlist, matrix, v_perm),
-                ));
+                return Some(SearchRecord { 
+                    stabilizations: 0,
+                    vlist: vertlist.clone(),
+                    alexander_grading: a_grading(&vertlist, &matrix, &v_perm),
+                    matrix: matrix.clone(),
+                    gridstate: v_perm.clone(),
+                    perm_type: String::from("v_type_0"),
+
+                });
             }
         }
 
@@ -478,27 +565,86 @@ fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
 /// Notes
 /// -----
 /// We use a breadth-first search approach to explore commutation space.
-fn gridstate_finder_commute<K, V>(vertlist: DirList, n: i32) -> Option<HashMap<K, V>> {
+fn gridstate_finder_commute(vertlist: DirList, n: i32) -> Option<SearchRecord> {
+    // let perm_result = try_permutations(vertlist)
     todo!()
 }
 
-fn _gridstate_finder_commute_with_visited<K, V>(
+struct SearchRecord {
+    stabilizations: i32,
+    vlist: DirList,
+    matrix: WindingMatrix,
+    gridstate: Permutation,
+    perm_type: String,
+    alexander_grading: i32
+}
+
+/// Helper function: gridstate_finder_commute that respects a global visited set.
+fn _gridstate_finder_commute_with_visited(
     vertlist: DirList,
     n: i32,
-) -> Option<HashMap<K, V>> {
-    todo!()
+    mut global_visited: HashSet<DirList>
+) -> Option<SearchRecord> {
+    // Try initial state
+    if let Some(result) = try_permutations(&vertlist) {
+        return Some(result);
+    }
+
+    let mut current_states = HashSet::from([vertlist]);
+    for _ in 0..n {
+
+        let mut new_states = HashSet::new();
+
+        for state in &current_states {
+            for commuted in knot_commute(state.clone()) {
+                if !global_visited.contains(&commuted) {
+                    global_visited.insert(commuted.clone());
+
+                    let perm_result = try_permutations(&commuted);
+                    if let Some(record) = perm_result {
+                        return Some(record);
+                    }
+                }
+                new_states.insert(commuted);
+            }
+        }
+        current_states = new_states.clone();
+        if current_states.capacity() == 0 {
+            break
+        }
+    }
+    return None
 }
 
-fn gridstate_finder_stab<K, V>(vertlist: DirList, n: i32) -> Option<HashMap<K, V>> {
-    todo!()
+fn gridstate_finder_stab(vertlist: DirList, n: i32) -> Option<SearchRecord> {
+    let global_visited = HashSet::new();
+    for segment in vertlist.0.clone() {
+        for (index, dir) in STAB_COMBINATIONS {
+            let stab_vertlist = stabilize(vertlist.clone(), segment, dir, index);
+            // Skip if we've seen this stabilized state before
+            if global_visited.contains(&stab_vertlist) {
+                continue;
+            }
+
+            let result = _gridstate_finder_commute_with_visited(
+                stab_vertlist, n, global_visited.clone()
+            );
+
+            if let Some(mut record) = result {
+                record.stabilizations = 1;
+                return Some(record);
+            }
+        }
+    }
+    None
 }
 
-fn destabilize(vertlist: DirList, loc_index: i32, direction: StabDir, tuple_index: i32) -> DirList {
-    let is_north = direction.is_north();
-    let is_west = direction.is_west();
-}
+// fn destabilize(vertlist: DirList, loc_index: i32, direction: StabDir, tuple_index: i32) -> DirList {
+//     let is_north = direction.is_north();
+//     let is_west = direction.is_west();
+// }
 
-fn stabilize(vertlist: DirList, loc: (i32, i32), direction: StabDir, tuple_index: i32) -> DirList {
+fn stabilize(vertlist: DirList, loc: (i32, i32), direction: StabDir, tuple_index: usize) -> DirList {
     let is_north = direction.is_north();
     let is_west = direction.is_west();
 
@@ -508,15 +654,25 @@ fn stabilize(vertlist: DirList, loc: (i32, i32), direction: StabDir, tuple_index
         panic!("Segment ({l0},{l1}) not in vertical list");
     }
 
-    let k = vertlist.0.iter().position(|a| a == &loc);
-    let temp: Vec<i32> = vertlist.0.iter().map(|(a, b)| [a, b]).collect();
+    let k = vertlist.0.iter().position(|a| a == &loc).unwrap();
+    let loc = [loc.0, loc.1];
+    let mut temp: Vec<[i32; 2]> = vertlist.0.iter().map(|(a, b)| [*a, *b]).collect();
 
-    for segment in vertlist.0 {
-        for j in temp.len() {
+    let templen = temp.len();
+    for segment in &mut temp {
+        for j in 0..templen {
+            if segment[j] > loc[tuple_index] || (!is_north && segment[j] >= loc[tuple_index]) {
+                segment[j] += 1;
+            }
         }
     }
+    let insert_offset = if is_west { 1 } else { 0 };
+    let remainder_offset = 1 - insert_offset;
+    let segment = if is_north == (tuple_index == 0) { [loc[tuple_index], loc[tuple_index] + 1] } else { [loc[tuple_index] + 1, loc[tuple_index]]};
+    temp.insert(k + insert_offset, segment);
+    temp[k + remainder_offset][tuple_index] = loc[tuple_index] + if is_north { 1 } else { 0 };
 
-    todo!()
+    DirList(temp.iter().map(|[a, b]| (*a, *b)).collect())
 }
 
 impl Display for DirList {
