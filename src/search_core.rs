@@ -241,7 +241,7 @@ pub fn h_to_v(horzlist: DirList) -> DirList {
 
 pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
     let (a, b) = t1;
-    let (c, d) = t1;
+    let (c, d) = t2;
 
     let max1 = max(a, b);
     let min1 = min(a, b);
