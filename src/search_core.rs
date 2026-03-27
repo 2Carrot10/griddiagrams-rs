@@ -594,8 +594,8 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
 /// Notes
 /// -----
 /// We use a breadth-first search approach to explore commutation space.
-pub fn gridstate_finder_commute(vertlist: DirList, n: i32) -> Option<SearchRecord> {
-    _gridstate_finder_commute_with_visited(vertlist, n, HashSet::new())
+pub fn gridstate_finder_commute(vertlist: DirList, n: i32, threads: i32) -> Option<SearchRecord> {
+    _gridstate_finder_commute_with_visited(vertlist, n, threads, HashSet::new())
 }
 
 pub struct SearchRecord {
@@ -611,6 +611,7 @@ pub struct SearchRecord {
 pub fn _gridstate_finder_commute_with_visited(
     vertlist: DirList,
     n: i32,
+    threads: i32,
     mut global_visited: HashSet<DirList>,
 ) -> Option<SearchRecord> {
     // Try initial state
@@ -622,8 +623,8 @@ pub fn _gridstate_finder_commute_with_visited(
     let mut previous_states_len = current_states.len();
     for _ in 0..n {
 
-        println!("Size of the frontier: {}", current_states.len());
-        println!("Ratio of growth: {}", (current_states.len() as f32) / (previous_states_len as f32));
+        print!("Size of the frontier: {:10}", current_states.len());
+        println!("Ratio change: {:.2}%", 100.0 * (current_states.len() as f32) / (previous_states_len as f32));
         previous_states_len = current_states.len();
         let mut new_states = HashSet::new();
 
@@ -649,7 +650,7 @@ pub fn _gridstate_finder_commute_with_visited(
     return None;
 }
 
-pub fn gridstate_finder_stab(vertlist: DirList, n: i32) -> Option<SearchRecord> {
+pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32) -> Option<SearchRecord> {
     let global_visited = HashSet::new();
     for segment in vertlist.0.clone() {
         for (index, dir) in [(0, StabDir::NorthWest)] /* STAB_COMBINATIONS */ {

@@ -36,6 +36,9 @@ struct Args {
     /// Number of times to greet
     #[arg(short='n', long, default_value_t = 200)]
     depth: i32,
+
+    #[arg(short, long, default_value_t = 8)]
+    threads: i32,
 }
 
 fn main() {
