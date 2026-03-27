@@ -619,9 +619,12 @@ pub fn _gridstate_finder_commute_with_visited(
     }
 
     let mut current_states = HashSet::from([vertlist]);
+    let mut previous_states_len = current_states.len();
     for _ in 0..n {
 
-        println!("Size of the frontier with visited: {}", current_states.len());
+        println!("Size of the frontier: {}", current_states.len());
+        println!("Ratio of growth: {}", (current_states.len() as f32) / (previous_states_len as f32));
+        previous_states_len = current_states.len();
         let mut new_states = HashSet::new();
 
         for state in &current_states {
