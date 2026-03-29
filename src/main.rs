@@ -33,6 +33,9 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("stab"))]
     algorithm: String,
 
+    #[arg(long)]
+    no_logging: bool,
+
     /// Number of times to greet
     #[arg(short='n', long, default_value_t = 200)]
     depth: i32,
@@ -56,8 +59,8 @@ fn main() {
         println!("*** {}", knot);
         println!("{}", vertlist);
         match args.algorithm.as_str() {
-            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, args.threads),
-            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, args.threads),
+            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, args.threads, !args.no_logging),
+            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, args.threads, !args.no_logging),
             _ => panic!("Could not read algorithm type")
         };
     }

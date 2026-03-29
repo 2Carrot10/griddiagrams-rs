@@ -594,8 +594,8 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
 /// Notes
 /// -----
 /// We use a breadth-first search approach to explore commutation space.
-pub fn gridstate_finder_commute(vertlist: DirList, n: i32, threads: i32) -> Option<SearchRecord> {
-    _gridstate_finder_commute_with_visited(vertlist, n, threads, HashSet::new())
+pub fn gridstate_finder_commute(vertlist: DirList, n: i32, threads: i32, logging: bool) -> Option<SearchRecord> {
+    _gridstate_finder_commute_with_visited(vertlist, n, threads, logging, HashSet::new())
 }
 
 pub struct SearchRecord {
@@ -612,6 +612,7 @@ pub fn _gridstate_finder_commute_with_visited(
     vertlist: DirList,
     n: i32,
     threads: i32,
+    logging: bool,
     mut global_visited: HashSet<DirList>,
 ) -> Option<SearchRecord> {
     // Try initial state
@@ -625,19 +626,28 @@ pub fn _gridstate_finder_commute_with_visited(
     for _ in 0..n {
 
 
-        print!("Size of the frontier: {:<10}", current_states.len());
-        let ratio = (current_states.len() as f32) / (previous_states_len as f32);
-        let format_blocks = min(30, (ratio * 10.0) as usize);
-        print!("Average commutations: {}", commutations_num.iter().sum::<i32>() / commutations_num.len() as i32);
-        print!("  [{}{}]  ", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
-        println!("Ratio change: {:.2}%", 100.0 * ratio);
+        if logging {
+            print!("Size of the frontier: {:<10}", current_states.len());
+            let ratio = (current_states.len() as f32) / (previous_states_len as f32);
+            let format_blocks = min(30, (ratio * 10.0) as usize);
+            print!("  [{}{}]  ", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
+            print!("Ratio change: {:.2}%", 100.0 * ratio);
+            if commutations_num.len() == 0 {
+                print!("   Average commutations: NaN");
+            } else {
+                print!("   Average commutations: {}", commutations_num.iter().sum::<f32>() / commutations_num.len() as f32);
+            }
+
+        println!();
+        }
+
         commutations_num = vec![];
         previous_states_len = current_states.len();
         let mut new_states = HashSet::new();
-
+   
         for state in &current_states {
             let commuted_states = knot_commute(state.clone());
-            commutations_num.push(commuted_states.len() as i32);
+            commutations_num.push(commuted_states.len() as f32);
             for commuted in commuted_states {
                 if !global_visited.contains(&commuted) {
                     global_visited.insert(commuted.clone());
@@ -659,10 +669,10 @@ pub fn _gridstate_finder_commute_with_visited(
     return None;
 }
 
-pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32) -> Option<SearchRecord> {
+pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32, logging: bool) -> Option<SearchRecord> {
     let global_visited = HashSet::new();
     for segment in vertlist.0.clone() {
-        for (index, dir) in [(0, StabDir::NorthWest)] /* STAB_COMBINATIONS */ {
+        for (index, dir) in STAB_COMBINATIONS {
             let stab_vertlist = stabilize(vertlist.clone(), segment, dir, index);
             // Skip if we've seen this stabilized state before
             if global_visited.contains(&stab_vertlist) {
@@ -670,7 +680,7 @@ pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32) -> Option<
             }
 
             let result =
-                _gridstate_finder_commute_with_visited(stab_vertlist, n, threads, global_visited.clone());
+                _gridstate_finder_commute_with_visited(stab_vertlist, n, threads, logging, global_visited.clone());
 
             if let Some(mut record) = result {
                 record.stabilizations = 1;
