@@ -5,6 +5,7 @@ use std::iter;
 use std::io::{self, Write};
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 
 use crate::LoggingType;
@@ -669,16 +670,14 @@ pub fn _gridstate_finder_commute_with_visited(
         // This set intersection is an Abelian Monoid!
         let adjacent_states: HashSet<DirList> = current_states
             .into_par_iter()
-            .map(knot_commute)
-            .flatten()
+            .flat_map(knot_commute)
             .filter(|a| !global_visited.contains(a)) // Take difference
             .collect();
 
         if let Some(record) = adjacent_states
-            .iter()
-            .map(try_permutations)
-            .flatten()
-            .next()
+            .par_iter()
+            .filter_map(try_permutations)
+            .find_any(|_| true) // Somewhat messy
         {
             return Some(record);
         }
