@@ -18,7 +18,7 @@ const UNSOLVED_KNOT_NAMES: [&str; 12] = [
 struct Args {
     ///
     #[arg(short, long)]
-    output_dir: String,
+    output_dir: Option<String>,
 
     /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas, a
     /// range "<start> - <end>", a percentage of the dataset to use "<percent>%".
