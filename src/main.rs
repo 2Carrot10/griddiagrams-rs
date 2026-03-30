@@ -41,8 +41,8 @@ struct Args {
     #[arg(short='n', long, default_value_t = 200)]
     depth: i32,
 
-    #[arg(short, long, default_value_t = 8)]
-    threads: i32,
+    #[arg(short, long)]
+    threads: Option<i32>,
 }
 
 pub enum LoggingType {
@@ -65,7 +65,9 @@ fn main() {
     };
 
     // Set rayon thread count global
-    rayon::ThreadPoolBuilder::new().num_threads(args.threads as usize).build_global().unwrap();
+    if let Some(t) = args.threads {
+    rayon::ThreadPoolBuilder::new().num_threads(t as usize).build_global().unwrap();
+    }
 
     for knot in knot_names {
         let vertlist = get_vlist_by_name(knot.to_string(), &csv);
@@ -75,8 +77,8 @@ fn main() {
             println!("{}", vertlist);
         }
         match args.algorithm.as_str() {
-            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, args.threads, &logging_type),
-            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, args.threads, &logging_type),
+            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, &logging_type),
+            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, &logging_type),
             _ => panic!("Could not read algorithm type")
         };
     }

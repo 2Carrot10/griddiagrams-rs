@@ -599,10 +599,9 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
 pub fn gridstate_finder_commute(
     vertlist: DirList,
     n: i32,
-    threads: i32,
     logging: &LoggingType,
 ) -> Option<SearchRecord> {
-    _gridstate_finder_commute_with_visited(vertlist, n, threads, logging, HashSet::new())
+    _gridstate_finder_commute_with_visited(vertlist, n, logging, HashSet::new())
 }
 
 pub struct SearchRecord {
@@ -618,7 +617,6 @@ pub struct SearchRecord {
 pub fn _gridstate_finder_commute_with_visited(
     vertlist: DirList,
     n: i32,
-    threads: i32,
     logging: &LoggingType,
     mut global_visited: HashSet<DirList>,
 ) -> Option<SearchRecord> {
@@ -698,7 +696,6 @@ pub fn _gridstate_finder_commute_with_visited(
 pub fn gridstate_finder_stab(
     vertlist: DirList,
     n: i32,
-    threads: i32,
     logging: &LoggingType,
 ) -> Option<SearchRecord> {
     let global_visited = HashSet::new();
@@ -713,7 +710,6 @@ pub fn gridstate_finder_stab(
             let result = _gridstate_finder_commute_with_visited(
                 stab_vertlist,
                 n,
-                threads,
                 logging,
                 global_visited.clone(),
             );
