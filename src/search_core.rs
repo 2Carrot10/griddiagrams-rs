@@ -2,8 +2,12 @@ use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::iter;
+use std::io::{self, Write};
 
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
+
+use crate::LoggingType;
 
 pub type GridNotation = Vec<Vec<i32>>;
 
@@ -28,10 +32,7 @@ impl<'de> Deserialize<'de> for GridNotationContainer {
         let mut result = Vec::new();
 
         for chunk in inner.split("];") {
-            let chunk = chunk
-                .trim()
-                .trim_start_matches('[')
-                .trim_end_matches(']');
+            let chunk = chunk.trim().trim_start_matches('[').trim_end_matches(']');
 
             if chunk.is_empty() {
                 continue;
@@ -260,7 +261,7 @@ pub fn c_move(input_list: DirList) -> Vec<DirList> {
 
     let n = input_list.0.len();
 
-    for i in 0..(n-1) {
+    for i in 0..(n - 1) {
         if can_commute(input_list.0[i], input_list.0[i + 1]) {
             let mut swapped_list = input_list.clone();
             let a = swapped_list.0[i + 1];
@@ -327,7 +328,7 @@ pub fn knot_commute(vertlist: DirList) -> HashSet<DirList> {
 /// The winding number increases by 1 when crossing an upward segment
 /// and decreases by 1 when crossing a downward segment.
 pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
-    println!("{}",&vertlist);
+    println!("{}", &vertlist);
     let size = vertlist.0.len();
     let mut result = vec![];
     for i in 0..size {
@@ -594,7 +595,12 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
 /// Notes
 /// -----
 /// We use a breadth-first search approach to explore commutation space.
-pub fn gridstate_finder_commute(vertlist: DirList, n: i32, threads: i32, logging: bool) -> Option<SearchRecord> {
+pub fn gridstate_finder_commute(
+    vertlist: DirList,
+    n: i32,
+    threads: i32,
+    logging: &LoggingType,
+) -> Option<SearchRecord> {
     _gridstate_finder_commute_with_visited(vertlist, n, threads, logging, HashSet::new())
 }
 
@@ -612,64 +618,90 @@ pub fn _gridstate_finder_commute_with_visited(
     vertlist: DirList,
     n: i32,
     threads: i32,
-    logging: bool,
+    logging: &LoggingType,
     mut global_visited: HashSet<DirList>,
 ) -> Option<SearchRecord> {
     // Try initial state
+    let do_logging = !matches!(logging, LoggingType::None);
+    let single_line = matches!(logging, LoggingType::SingleLine);
+
     if let Some(result) = try_permutations(&vertlist) {
         return Some(result);
     }
 
     let mut current_states = HashSet::from([vertlist]);
     let mut previous_states_len = current_states.len();
-    let mut commutations_num = vec![];
-    for _ in 0..n {
-
-
-        if logging {
+    // let mut commutations_num = vec![];
+    for i in 0..n {
+        if do_logging {
+            print!("{:<5}  ",i);
             print!("Size of the frontier: {:<10}", current_states.len());
             let ratio = (current_states.len() as f32) / (previous_states_len as f32);
             let format_blocks = min(30, (ratio * 10.0) as usize);
-            print!("  [{}{}]  ", "▒".repeat(format_blocks), "-".repeat(30 - format_blocks));
+            print!(
+                "  [{}{}]  ",
+                "▒".repeat(format_blocks),
+                "-".repeat(30 - format_blocks)
+            );
             print!("Ratio change: {:.2}%", 100.0 * ratio);
+            /*
             if commutations_num.len() == 0 {
                 print!("   Average commutations: NaN");
             } else {
-                print!("   Average commutations: {}", commutations_num.iter().sum::<f32>() / commutations_num.len() as f32);
+                print!(
+                    "   Average commutations: {}",
+                    commutations_num.iter().sum::<f32>() / commutations_num.len() as f32
+                );
             }
+            */
 
-        println!();
+            if single_line {
+                print!("\r");
+                io::stdout().flush();
+            }
+            else {
+                print!("\n"); // Autoflushes
+            }
         }
 
-        commutations_num = vec![];
         previous_states_len = current_states.len();
-        let mut new_states = HashSet::new();
-   
-        for state in &current_states {
-            let commuted_states = knot_commute(state.clone());
-            commutations_num.push(commuted_states.len() as f32);
-            for commuted in commuted_states {
-                if !global_visited.contains(&commuted) {
-                    global_visited.insert(commuted.clone());
 
-                    let perm_result = try_permutations(&commuted);
-                    if let Some(record) = perm_result {
-                        return Some(record);
-                    }
-                    new_states.insert(commuted);
-                }
-            }
+        // This set intersection is an Abelian Monoid!
+        let adjacent_states: HashSet<DirList> = current_states
+            .into_par_iter()
+            .map(knot_commute)
+            .flatten()
+            .filter(|a| !global_visited.contains(a)) // Take difference
+            .collect();
+
+        if let Some(record) = adjacent_states
+            .iter()
+            .map(try_permutations)
+            .flatten()
+            .next()
+        {
+            return Some(record);
         }
-        current_states = new_states.clone();
+
+        // Equivalent to global_visited := global_visited U adjacent_states, destroying adjacent_states in the process.
+        // TODO: get rid of clone
+        global_visited.extend(adjacent_states.clone());
+        current_states = adjacent_states;
+
         if current_states.is_empty() {
-            print!("Zero current states");
+            // print!("Zero current states");
             break;
         }
     }
     return None;
 }
 
-pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32, logging: bool) -> Option<SearchRecord> {
+pub fn gridstate_finder_stab(
+    vertlist: DirList,
+    n: i32,
+    threads: i32,
+    logging: &LoggingType,
+) -> Option<SearchRecord> {
     let global_visited = HashSet::new();
     for segment in vertlist.0.clone() {
         for (index, dir) in STAB_COMBINATIONS {
@@ -679,8 +711,13 @@ pub fn gridstate_finder_stab(vertlist: DirList, n: i32, threads: i32, logging: b
                 continue;
             }
 
-            let result =
-                _gridstate_finder_commute_with_visited(stab_vertlist, n, threads, logging, global_visited.clone());
+            let result = _gridstate_finder_commute_with_visited(
+                stab_vertlist,
+                n,
+                threads,
+                logging,
+                global_visited.clone(),
+            );
 
             if let Some(mut record) = result {
                 record.stabilizations = 1;
@@ -762,12 +799,12 @@ impl Display for DirList {
                     );
                     downward_lines[i as usize] = !downward_lines[i as usize];
                 } else {
-                    if min(x, o) < i && i < max(x, o) {
+                    if downward_lines[i as usize] {
+                        print!("│");
+                    } else if min(x, o) < i && i < max(x, o) {
                         print!("─");
-                    } else if downward_lines[i as usize] {
-                        print!("│")
                     } else {
-                        print!("·")
+                        print!("·");
                     }
                 }
             }

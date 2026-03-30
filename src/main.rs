@@ -29,12 +29,13 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("unsolved"))]
     knots: String,
 
-    /// stab or commute
+    /// Options: stab, commute
     #[arg(short, long, default_value_t = String::from("stab"))]
     algorithm: String,
 
-    #[arg(long)]
-    no_logging: bool,
+    /// Options: none, single, multi
+    #[arg(long, default_value_t = String::from("single"))]
+    logging: String,
 
     /// Number of times to greet
     #[arg(short='n', long, default_value_t = 200)]
@@ -44,23 +45,38 @@ struct Args {
     threads: i32,
 }
 
+pub enum LoggingType {
+    None, SingleLine, MultiLine
+}
+
 fn main() {
     let args = Args::parse();
     let csv = load_knot_data();
+    let logging_type = match args.logging.as_str() {
+        "none" => LoggingType::None,
+        "multi" => LoggingType::MultiLine,
+        "single" => LoggingType::SingleLine,
+        _ => panic!("Could not read logging type")
+    };
     let knot_names = match args.knots.as_str() {
         "unsolved" => UNSOLVED_KNOT_NAMES.to_vec().into_iter().map(|a| a.to_string()).collect(),
         "all" => get_all_knot_names(&csv),
         names => names.split(",").map(|a| a.trim().to_string()).collect(),
     };
 
+    // Set rayon thread count global
+    rayon::ThreadPoolBuilder::new().num_threads(args.threads as usize).build_global().unwrap();
+
     for knot in knot_names {
-        println!("----");
         let vertlist = get_vlist_by_name(knot.to_string(), &csv);
-        println!("*** {}", knot);
-        println!("{}", vertlist);
+        if !matches!(logging_type, LoggingType::None) {
+            println!("----");
+            println!("*** {}", knot);
+            println!("{}", vertlist);
+        }
         match args.algorithm.as_str() {
-            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, args.threads, !args.no_logging),
-            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, args.threads, !args.no_logging),
+            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, args.threads, &logging_type),
+            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, args.threads, &logging_type),
             _ => panic!("Could not read algorithm type")
         };
     }
