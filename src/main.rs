@@ -128,7 +128,7 @@ fn main() {
 
         let search_record = search_function(vertlist, args.depth, &logging_type);
 
-        if let Some(mut record) = search_record {
+        if let Ok(mut record) = search_record {
             positive_results += 1;
             if log_positives {
                 println!("Found nice knot for: {}", knot);

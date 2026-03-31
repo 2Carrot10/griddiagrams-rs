@@ -660,7 +660,7 @@ pub fn gridstate_finder_commute(
     vertlist: DirList,
     n: i32,
     logging: &LoggingType,
-) -> Option<SearchRecord> {
+) -> Result<SearchRecord, SearchFailure> {
     _gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
 }
 
@@ -673,6 +673,11 @@ pub struct SearchRecord {
     perm_type: String,
     alexander_grading: i32,
     pub knot: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum SearchFailure {
+    HitDepthLimit, ExaustedSearchSpace
 }
 
 fn gridstate_log(
@@ -716,7 +721,7 @@ pub fn _gridstate_finder_commute_with_visited(
     vertlists: HashSet<DirList>,
     n: i32,
     logging: &LoggingType,
-) -> Option<SearchRecord> {
+) -> Result<SearchRecord, SearchFailure> {
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::SingleLine);
 
@@ -743,7 +748,7 @@ pub fn _gridstate_finder_commute_with_visited(
             if single_line {
                 println!("");
             }
-            return Some(record);
+            return Ok(record);
         }
 
         if current_states.is_empty() {
@@ -751,7 +756,7 @@ pub fn _gridstate_finder_commute_with_visited(
                 println!("");
                 println!("Zero current states");
             }
-            return None;
+            return Err(SearchFailure::ExaustedSearchSpace);
         }
 
         previous_states.extend(current_states.clone());
@@ -759,14 +764,14 @@ pub fn _gridstate_finder_commute_with_visited(
     if single_line {
         println!("");
     }
-    None
+    Err(SearchFailure::HitDepthLimit)
 }
 
 pub fn gridstate_finder_stab(
     vertlist: DirList,
     n: i32,
     logging: &LoggingType,
-) -> Option<SearchRecord> {
+) -> Result<SearchRecord, SearchFailure> {
     let mut grid_stab_combos = vec![];
     for segment in vertlist.0.clone() {
         for (index, dir) in STAB_COMBINATIONS {
@@ -778,14 +783,13 @@ pub fn gridstate_finder_stab(
         .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
         .collect();
 
-    let result = _gridstate_finder_commute_with_visited(gridstates_after_stab, n, logging);
+    let mut result = _gridstate_finder_commute_with_visited(gridstates_after_stab, n, logging);
 
-    if let Some(mut record) = result {
+    if let Ok(ref mut record) = result {
         record.stabilizations = 1;
-        Some(record)
-    } else {
-        None
     }
+
+    result
 }
 
 // fn destabilize(vertlist: DirList, loc_index: i32, direction: StabDir, tuple_index: i32) -> DirList {
