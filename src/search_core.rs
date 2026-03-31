@@ -334,7 +334,6 @@ pub fn knot_commute(vertlist: DirList) -> HashSet<DirList> {
 /// The winding number increases by 1 when crossing an upward segment
 /// and decreases by 1 when crossing a downward segment.
 pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
-    println!("{}", &vertlist);
     let size = vertlist.0.len();
     let mut result = vec![];
     for i in 0..size {
@@ -558,6 +557,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
             .map(|a| a.into_iter().min().unwrap())
             .sum::<i32>();
 
+
         let colsum = transpose(matrix.clone())
             .into_iter()
             .map(|a| a.into_iter().min().unwrap())
@@ -572,6 +572,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     matrix: matrix.clone(),
                     gridstate: h_perm.clone(),
                     perm_type: String::from("h_type_0"),
+                    knot: None
                 });
             }
         }
@@ -585,6 +586,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     matrix: matrix.clone(),
                     gridstate: v_perm.clone(),
                     perm_type: String::from("v_type_0"),
+                    knot: None
                 });
             }
         }
@@ -662,6 +664,7 @@ pub fn gridstate_finder_commute(
     _gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
 }
 
+#[derive(Debug)]
 pub struct SearchRecord {
     stabilizations: i32,
     vlist: DirList,
@@ -669,9 +672,15 @@ pub struct SearchRecord {
     gridstate: Permutation,
     perm_type: String,
     alexander_grading: i32,
+    pub knot: Option<String>,
 }
 
-fn gridstate_log(current_states: &HashSet<DirList>, iteration: i32, previous_states_len: usize, single_line: bool) {
+fn gridstate_log(
+    current_states: &HashSet<DirList>,
+    iteration: i32,
+    previous_states_len: usize,
+    single_line: bool,
+) {
     print!("{:<5}  ", iteration);
     print!("Size of the frontier: {:<10}", current_states.len());
     // print!("Size of the global: {:<10}", global_visited.len());
@@ -712,18 +721,18 @@ pub fn _gridstate_finder_commute_with_visited(
     let single_line = matches!(logging, LoggingType::SingleLine);
 
     let mut current_states = vertlists;
-    let mut previous_states_len = current_states.len();
+    let mut previous_states = HashSet::new(); // Only keeps the last iteration
     for i in 0..n {
         if do_logging {
-            gridstate_log(&current_states, i, previous_states_len, single_line);
-            previous_states_len = current_states.len();
+            gridstate_log(&current_states, i, previous_states.len(), single_line);
         }
+
 
         current_states = current_states
             .clone()
             .into_par_iter()
             .flat_map(knot_commute)
-            .filter(|a| !current_states.contains(a))
+            .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
             .collect::<HashSet<_>>();
 
         if let Some(record) = current_states
@@ -731,13 +740,24 @@ pub fn _gridstate_finder_commute_with_visited(
             .filter_map(try_permutations)
             .find_any(|_| true)
         {
+            if single_line {
+                println!("");
+            }
             return Some(record);
         }
 
         if current_states.is_empty() {
-            // print!("Zero current states");
+            if single_line {
+                println!("");
+                println!("Zero current states");
+            }
             return None;
         }
+
+        previous_states.extend(current_states.clone());
+    }
+    if single_line {
+        println!("");
     }
     None
 }
@@ -850,7 +870,6 @@ impl Display for DirList {
             }
             println!();
         }
-
         std::fmt::Result::Ok(())
     }
 }

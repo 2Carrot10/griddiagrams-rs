@@ -6,7 +6,7 @@ mod search_core;
 mod tests;
 use clap::Parser;
 
-use crate::data::{get_all_knot_names, get_vlist_by_name, load_knot_data};
+use crate::{data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, search_core::{gridstate_finder_commute, gridstate_finder_stab}};
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
     "12n_79", "12n_168", "13n_282", "13n_917", "13n_1279", "13n_1281", "13n_1413", "13n_1826",
@@ -34,6 +34,14 @@ struct Args {
     #[arg(long, default_value_t = String::from("single"))]
     logging: String,
 
+    /// Options: positives, negative, both
+    #[arg(long, default_value_t = String::from("both"))]
+    result_type: String,
+
+    /// Hide analytics at the end.
+    #[arg(long)]
+    hide_analytics: bool,
+
     /// Number of times to greet
     #[arg(short = 'n', long, default_value_t = 200)]
     depth: i32,
@@ -59,6 +67,13 @@ fn main() {
         "multi" => LoggingType::MultiLine,
         "single" => LoggingType::SingleLine,
         _ => panic!("Could not read logging type"),
+    };
+    let (log_positives, log_negatives) = match args.result_type.as_str() {
+        "positives" => (true, false),
+        "negatives" => (false, true),
+        "both" => (true, true),
+        "neither" => (false, false),
+        _ => panic!("Could not read result type"),
     };
     let knot_names = match args.knots.as_str() {
         "unsolved" => UNSOLVED_KNOT_NAMES
@@ -92,19 +107,45 @@ fn main() {
             .unwrap();
     }
 
+    let mut positive_results = 0;
+    let mut negative_results = 0;
+
+    let search_function = match args.algorithm.as_str() {
+        "stab" => gridstate_finder_stab,
+        "commute" => gridstate_finder_commute,
+        _ => panic!("Could not read algorithm type"),
+    };
+    let total_length = knot_names.len();
     for (i, knot) in knot_names.into_iter().enumerate() {
         let vertlist = get_vlist_by_name(knot.to_string(), &csv);
         if !matches!(logging_type, LoggingType::None) {
             println!("----");
-            println!("#{}: {}", i, knot);
+            println!("# {}: {}", i, knot);
             if !args.hide_diagrams {
                 println!("{}", vertlist);
             }
         }
-        match args.algorithm.as_str() {
-            "stab" => search_core::gridstate_finder_stab(vertlist, args.depth, &logging_type),
-            "commute" => search_core::gridstate_finder_commute(vertlist, args.depth, &logging_type),
-            _ => panic!("Could not read algorithm type"),
-        };
+
+        let search_record = search_function(vertlist, args.depth, &logging_type);
+
+        if let Some(mut record) = search_record {
+            positive_results += 1;
+            if log_positives {
+                println!("Found nice knot for: {}", knot);
+                record.knot = Some(knot);
+            }
+        } else {
+            negative_results += 1;
+            if log_negatives {
+                println!("Could not find nice knot for {}.", knot)
+            }
+        }
+    }
+
+    if !args.hide_analytics {
+        println!("========= Analytics =========");
+        println!("Total: {}", total_length);
+        println!("Positive results: {}   {}%", positive_results, (100 * positive_results) /  total_length);
+        println!("Negative results: {}   {}%", negative_results, (100 *  negative_results) / total_length);
     }
 }
