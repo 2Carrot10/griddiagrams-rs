@@ -1,8 +1,8 @@
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::iter;
 use std::io::{self, Write};
+use std::iter;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
@@ -67,6 +67,11 @@ pub enum StabDir {
     SouthEast,
 }
 
+pub enum Dir {
+    Horz,
+    Vert,
+}
+
 pub const STAB_COMBINATIONS: [(usize, StabDir); 8] = [
     (0, StabDir::NorthWest),
     (1, StabDir::NorthWest),
@@ -98,7 +103,7 @@ impl StabDir {
     }
 }
 
-type Permutation = Vec<i32>;
+type Permutation = Vec<usize>;
 type WindingMatrix = Vec<Vec<i32>>;
 
 pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
@@ -353,17 +358,74 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
     result
 }
 
-pub fn h_type_0_permutation(matrix: WindingMatrix) -> Result<Permutation, String> {
-    todo!()
-    // let n = matrix.len();
-    // let min_indices = [];
-    // while min_indices.iter().any() {
-    //     let singleton_index = ..
-    // }
-}
+// Find a unique horizontal or vertical type-0 permutation (i.e. a unique row-perfect grid state) if it exists.
+//
+// Parameters
+// ----------
+// matrix : np.ndarray
+//     Winding matrix.
+//
+// Returns
+// -------
+// List[int] or str
+//     Permutation if unique one exists, error message otherwise.
+pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permutation, String> {
+    let n = matrix.len();
+    let type_string = match direction {
+        Dir::Horz => "h-type-0",
+        Dir::Vert => "v-type-0",
+    };
+    let mut min_indices: Vec<HashSet<usize>> = matrix
+        .into_iter()
+        .map(|row| {
+            let min = row.iter().min().unwrap();
+            row.iter()
+                .enumerate()
+                .filter(|(_, val)| val == &min)
+                .map(|(index, _)| index)
+                .collect()
+        })
+        .collect();
+    let mut result = vec![None; n];
 
-pub fn v_type_0_permutation(matrix: WindingMatrix) -> Result<Permutation, String> {
-    todo!()
+    while min_indices.iter().any(|s| !s.is_empty()) {
+        match min_indices
+            .iter()
+            .enumerate()
+            .filter(|(_, val)| val.len() == 1)
+            .map(|(index, _)| index)
+            .next()
+        {
+            None => {
+                return Err(String::from(format!(
+                    "No unique {} permutation exists.",
+                    type_string
+                )));
+            }
+            Some(first_elem) => {
+                let x = min_indices[first_elem].iter().next().unwrap().clone();
+                result[first_elem] = Some(x.clone());
+
+                for s in &mut min_indices {
+                    s.remove(&x);
+                }
+
+                if min_indices.is_empty() {
+                    return Err(String::from(format!(
+                        "No unique {} permutation exists.",
+                        type_string
+                    )));
+                }
+            }
+        }
+    }
+
+    if result.is_empty() {
+        return Err(String::from(
+            "This should never happen, check code if it does.",
+        ));
+    }
+    return Ok(result.into_iter().flatten().collect());
 }
 
 /// Reverse the orientation of a knot diagram.
@@ -464,8 +526,7 @@ pub fn a_grading(vertlist: &DirList, matrix: &WindingMatrix, permutation: &Permu
 /// List[int]
 ///     Horizontal permutation.
 pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
-    let mut indexed_perm: Vec<(i32, i32)> =
-        (0..vperm.len()).map(|i| (vperm[i], i as i32)).collect();
+    let mut indexed_perm: Vec<(usize, usize)> = (0..vperm.len()).map(|i| (vperm[i], i)).collect();
     indexed_perm.sort_by_key(|a| a.0);
     indexed_perm.iter().map(|(_, index)| *index).collect()
 }
@@ -488,10 +549,7 @@ pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
 /// This function tries both the original and reversed orientation,
 /// checking for both horizontal and vertical perfect grid states.
 pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
-    return None; // TODO:
-
-    //(DirList, String, Permutation, WindingMatrix, i32)
-    // Does not attempt reversed
+    // try_instance_permutations Does not attempt reversed
     fn try_instance_permutations(vertlist: DirList) -> Option<SearchRecord> {
         let matrix = w_matrix(vertlist.clone());
         let rowsum = matrix
@@ -506,7 +564,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
             .sum::<i32>();
 
         if rowsum >= colsum {
-            if let Ok(h_perm) = h_type_0_permutation(matrix.clone()) {
+            if let Ok(h_perm) = type_0_permutation(matrix.clone(), Dir::Horz) {
                 return Some(SearchRecord {
                     stabilizations: 0,
                     vlist: vertlist.clone(),
@@ -519,7 +577,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
         }
 
         if colsum >= rowsum {
-            if let Ok(v_perm) = v_type_0_permutation(matrix.clone()) {
+            if let Ok(v_perm) = type_0_permutation(matrix.clone(), Dir::Vert) {
                 return Some(SearchRecord {
                     stabilizations: 2,
                     vlist: vertlist.clone(),
@@ -601,7 +659,7 @@ pub fn gridstate_finder_commute(
     n: i32,
     logging: &LoggingType,
 ) -> Option<SearchRecord> {
-    _gridstate_finder_commute_with_visited(vertlist, n, logging, HashSet::new())
+    _gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
 }
 
 pub struct SearchRecord {
@@ -613,84 +671,75 @@ pub struct SearchRecord {
     alexander_grading: i32,
 }
 
+fn gridstate_log(current_states: &HashSet<DirList>, iteration: i32, previous_states_len: usize, single_line: bool) {
+    print!("{:<5}  ", iteration);
+    print!("Size of the frontier: {:<10}", current_states.len());
+    // print!("Size of the global: {:<10}", global_visited.len());
+    let ratio = (current_states.len() as f32) / (previous_states_len as f32);
+    let format_blocks = min(30, (ratio * 10.0) as usize);
+    print!(
+        "  [{}{}]  ",
+        "▒".repeat(format_blocks),
+        "-".repeat(30 - format_blocks)
+    );
+    print!("Ratio change: {:.2}%", 100.0 * ratio);
+    /*
+    if commutations_num.len() == 0 {
+        print!("   Average commutations: NaN");
+    } else {
+        print!(
+            "   Average commutations: {}",
+            commutations_num.iter().sum::<f32>() / commutations_num.len() as f32
+        );
+    }
+    */
+
+    if single_line {
+        print!("\r");
+        io::stdout().flush();
+    } else {
+        print!("\n"); // Autoflushes
+    }
+}
+
 /// Helper function: gridstate_finder_commute that respects a global visited set.
 pub fn _gridstate_finder_commute_with_visited(
-    vertlist: DirList,
+    vertlists: HashSet<DirList>,
     n: i32,
     logging: &LoggingType,
-    mut global_visited: HashSet<DirList>,
 ) -> Option<SearchRecord> {
-    // Try initial state
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::SingleLine);
 
-    if let Some(result) = try_permutations(&vertlist) {
-        return Some(result);
-    }
-
-    let mut current_states = HashSet::from([vertlist]);
+    let mut current_states = vertlists;
     let mut previous_states_len = current_states.len();
-    // let mut commutations_num = vec![];
     for i in 0..n {
         if do_logging {
-            print!("{:<5}  ",i);
-            print!("Size of the frontier: {:<10}", current_states.len());
-            let ratio = (current_states.len() as f32) / (previous_states_len as f32);
-            let format_blocks = min(30, (ratio * 10.0) as usize);
-            print!(
-                "  [{}{}]  ",
-                "▒".repeat(format_blocks),
-                "-".repeat(30 - format_blocks)
-            );
-            print!("Ratio change: {:.2}%", 100.0 * ratio);
-            /*
-            if commutations_num.len() == 0 {
-                print!("   Average commutations: NaN");
-            } else {
-                print!(
-                    "   Average commutations: {}",
-                    commutations_num.iter().sum::<f32>() / commutations_num.len() as f32
-                );
-            }
-            */
-
-            if single_line {
-                print!("\r");
-                io::stdout().flush();
-            }
-            else {
-                print!("\n"); // Autoflushes
-            }
+            gridstate_log(&current_states, i, previous_states_len, single_line);
+            previous_states_len = current_states.len();
         }
 
-        previous_states_len = current_states.len();
-
-        // This set intersection is an Abelian Monoid!
-        let adjacent_states: HashSet<DirList> = current_states
+        current_states = current_states
+            .clone()
             .into_par_iter()
             .flat_map(knot_commute)
-            .filter(|a| !global_visited.contains(a)) // Take difference
-            .collect();
+            .filter(|a| !current_states.contains(a))
+            .collect::<HashSet<_>>();
 
-        if let Some(record) = adjacent_states
+        if let Some(record) = current_states
             .par_iter()
             .filter_map(try_permutations)
-            .find_any(|_| true) // Somewhat messy
+            .find_any(|_| true)
         {
             return Some(record);
         }
 
-        // Equivalent to global_visited := global_visited U adjacent_states, destroying adjacent_states in the process.
-        // TODO: get rid of clone
-        global_visited.extend(adjacent_states.clone());
-        current_states = adjacent_states;
-
         if current_states.is_empty() {
             // print!("Zero current states");
-            break;
+            return None;
         }
     }
-    return None;
+    None
 }
 
 pub fn gridstate_finder_stab(
@@ -698,29 +747,25 @@ pub fn gridstate_finder_stab(
     n: i32,
     logging: &LoggingType,
 ) -> Option<SearchRecord> {
-    let global_visited = HashSet::new();
+    let mut grid_stab_combos = vec![];
     for segment in vertlist.0.clone() {
         for (index, dir) in STAB_COMBINATIONS {
-            let stab_vertlist = stabilize(vertlist.clone(), segment, dir, index);
-            // Skip if we've seen this stabilized state before
-            if global_visited.contains(&stab_vertlist) {
-                continue;
-            }
-
-            let result = _gridstate_finder_commute_with_visited(
-                stab_vertlist,
-                n,
-                logging,
-                global_visited.clone(),
-            );
-
-            if let Some(mut record) = result {
-                record.stabilizations = 1;
-                return Some(record);
-            }
+            grid_stab_combos.push((segment, dir, index));
         }
     }
-    None
+    let gridstates_after_stab: HashSet<_> = grid_stab_combos
+        .into_iter()
+        .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
+        .collect();
+
+    let result = _gridstate_finder_commute_with_visited(gridstates_after_stab, n, logging);
+
+    if let Some(mut record) = result {
+        record.stabilizations = 1;
+        Some(record)
+    } else {
+        None
+    }
 }
 
 // fn destabilize(vertlist: DirList, loc_index: i32, direction: StabDir, tuple_index: i32) -> DirList {
