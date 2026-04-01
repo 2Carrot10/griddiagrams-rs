@@ -7,7 +7,7 @@ use std::ops::Deref;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::LoggingType;
 
@@ -58,7 +58,7 @@ impl<'de> Deserialize<'de> for GridNotationContainer {
 }
 
 // Either VertList or HorzList
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct DirList(Vec<(i32, i32)>);
 
 pub enum StabDir {
@@ -572,7 +572,6 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     matrix: matrix.clone(),
                     gridstate: h_perm.clone(),
                     perm_type: String::from("h_type_0"),
-                    knot: None,
                 });
             }
         }
@@ -586,7 +585,6 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     matrix: matrix.clone(),
                     gridstate: v_perm.clone(),
                     perm_type: String::from("v_type_0"),
-                    knot: None,
                 });
             }
         }
@@ -664,7 +662,7 @@ pub fn gridstate_finder_commute(
     _gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SearchRecord {
     stabilizations: i32,
     vlist: DirList,
@@ -672,13 +670,18 @@ pub struct SearchRecord {
     gridstate: Permutation,
     perm_type: String,
     alexander_grading: i32,
-    pub knot: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SearchFailure {
     HitDepthLimit,
     ExaustedSearchSpace,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KnotResult {
+    pub knot: String,
+    pub search_record: Result<SearchRecord, SearchFailure>
 }
 
 fn gridstate_log(
