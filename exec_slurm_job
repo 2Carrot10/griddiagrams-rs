@@ -1,0 +1,6 @@
+#!/bin/bash
+read -p "How many CPU cores? " cores
+read -p "How much memory (in MB)? " mem
+read -p "Type out the full command: ./griddiagrams " command
+
+srun -N 1 -n "$cores" --mem="$mem" --time=10 --partition=short --pty ./griddiagrams $command

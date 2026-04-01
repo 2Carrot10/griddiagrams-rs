@@ -5,7 +5,6 @@ use std::io::{self, Write};
 use std::iter;
 use std::ops::Deref;
 
-
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
@@ -559,7 +558,6 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
             .map(|a| a.into_iter().min().unwrap())
             .sum::<i32>();
 
-
         let colsum = transpose(matrix.clone())
             .into_iter()
             .map(|a| a.into_iter().min().unwrap())
@@ -574,7 +572,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     matrix: matrix.clone(),
                     gridstate: h_perm.clone(),
                     perm_type: String::from("h_type_0"),
-                    knot: None
+                    knot: None,
                 });
             }
         }
@@ -588,7 +586,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     matrix: matrix.clone(),
                     gridstate: v_perm.clone(),
                     perm_type: String::from("v_type_0"),
-                    knot: None
+                    knot: None,
                 });
             }
         }
@@ -679,7 +677,8 @@ pub struct SearchRecord {
 
 #[derive(Debug)]
 pub enum SearchFailure {
-    HitDepthLimit, ExaustedSearchSpace
+    HitDepthLimit,
+    ExaustedSearchSpace,
 }
 
 fn gridstate_log(
@@ -734,7 +733,8 @@ pub fn _gridstate_finder_commute_with_visited(
             gridstate_log(&current_states, i, previous_states.len(), single_line);
         }
 
-        current_states = current_states.iter().par_bridge()
+        current_states = current_states
+            .par_iter()
             .flat_map(|r| knot_commute(&r))
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
             .collect::<HashSet<_>>();
