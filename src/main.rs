@@ -127,6 +127,9 @@ fn main() {
         }
 
         let search_record = search_function(vertlist, args.depth, &logging_type);
+        if matches!(logging_type, LoggingType::SingleLine) {
+            println!("");
+        }
 
         if let Ok(mut record) = search_record {
             positive_results += 1;

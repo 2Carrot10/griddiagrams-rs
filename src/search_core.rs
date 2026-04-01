@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::iter;
+use std::ops::Deref;
+
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
@@ -222,7 +224,7 @@ pub fn vlist(gridlist: GridList) -> DirList {
 /// -------
 /// List[Tuple[int, int]]
 ///     Horizontal segment list.
-pub fn v_to_h(vertlist: DirList) -> DirList {
+pub fn v_to_h(vertlist: &DirList) -> DirList {
     let n = vertlist.0.len();
     let mut horzlist = vec![];
     for i in 0..n as i32 {
@@ -242,7 +244,7 @@ pub fn v_to_h(vertlist: DirList) -> DirList {
 }
 
 // The two functions are equivalent
-pub fn h_to_v(horzlist: DirList) -> DirList {
+pub fn h_to_v(horzlist: &DirList) -> DirList {
     v_to_h(horzlist)
 }
 
@@ -261,7 +263,7 @@ pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
         || (max2 >= max1 && min2 <= min1)
 }
 
-pub fn c_move(input_list: DirList) -> Vec<DirList> {
+pub fn c_move(input_list: &DirList) -> Vec<DirList> {
     let mut result = vec![];
     let mut seen = HashSet::new();
 
@@ -307,11 +309,11 @@ pub fn c_move(input_list: DirList) -> Vec<DirList> {
 //     todo!()
 // }
 
-pub fn knot_commute(vertlist: DirList) -> HashSet<DirList> {
-    let v_commutations = c_move(vertlist.clone());
-    let h_commutations = c_move(v_to_h(vertlist));
+pub fn knot_commute(vertlist: &DirList) -> HashSet<DirList> {
+    let v_commutations = c_move(vertlist);
+    let h_commutations = c_move(&v_to_h(vertlist)); // Bad clone
     let mut h_to_v_commutations: HashSet<DirList> =
-        h_commutations.into_iter().map(h_to_v).collect();
+        h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
 
     h_to_v_commutations.extend(v_commutations);
     h_to_v_commutations
@@ -344,7 +346,7 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
             let prev = row[row.len() - 1];
             if tail <= (i as i32) && (i as i32) < head {
                 row.push(prev + 1);
-            } else if head <= (i as i32) && head < tail {
+            } else if head <= (i as i32) && (i as i32) < tail {
                 row.push(prev - 1);
             } else {
                 row.push(prev);
@@ -732,11 +734,8 @@ pub fn _gridstate_finder_commute_with_visited(
             gridstate_log(&current_states, i, previous_states.len(), single_line);
         }
 
-
-        current_states = current_states
-            .clone()
-            .into_par_iter()
-            .flat_map(knot_commute)
+        current_states = current_states.iter().par_bridge()
+            .flat_map(|r| knot_commute(&r))
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
             .collect::<HashSet<_>>();
 
@@ -745,25 +744,16 @@ pub fn _gridstate_finder_commute_with_visited(
             .filter_map(try_permutations)
             .find_any(|_| true)
         {
-            if single_line {
-                println!("");
-            }
             return Ok(record);
         }
 
         if current_states.is_empty() {
-            if single_line {
-                println!("");
-                println!("Zero current states");
-            }
             return Err(SearchFailure::ExaustedSearchSpace);
         }
 
         previous_states.extend(current_states.clone());
     }
-    if single_line {
-        println!("");
-    }
+
     Err(SearchFailure::HitDepthLimit)
 }
 
@@ -838,7 +828,7 @@ pub fn stabilize(
 
 impl Display for DirList {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let horzlist = v_to_h(self.clone());
+        let horzlist = v_to_h(self);
         let mut downward_lines = vec![false; self.0.len()];
         for (x, o) in horzlist.0 {
             for i in 0..(self.0.len() as i32) {
@@ -880,10 +870,10 @@ impl Display for DirList {
 
 impl std::fmt::Debug for DirList {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let horzlist = v_to_h(self.clone());
+        let horzlist = v_to_h(self);
         let hlen = horzlist.0.len();
-        for (x, o) in horzlist.0 {
-            print!("{}", ".".repeat(min(x, o) as usize));
+        for (x, o) in &horzlist.0 {
+            print!("{}", ".".repeat(*min(x, o) as usize));
             print!("{}", if x < o { "○" } else { "✗" });
             print!("{}", "·".repeat(((x - o).abs() - 1) as usize));
             print!("{}", if x < o { "✗" } else { "○" });
