@@ -134,13 +134,13 @@ fn main() {
         if let Ok(mut record) = search_record {
             positive_results += 1;
             if log_positives {
-                println!("Found nice knot for: {}", knot);
+                println!("Found nice knot for: {}, #{}", knot, i);
                 record.knot = Some(knot);
             }
         } else {
             negative_results += 1;
             if log_negatives {
-                println!("Could not find nice knot for {}.", knot)
+                println!("Could not find nice knot for {}, #{}", knot, i);
             }
         }
     }
