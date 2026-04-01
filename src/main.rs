@@ -4,9 +4,17 @@ mod plotting;
 mod search;
 mod search_core;
 mod tests;
-use clap::Parser;
+use std::fs;
 
-use crate::{data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, search_core::{gridstate_finder_commute, gridstate_finder_stab}};
+use clap::Parser;
+use serde_json::{json, Map};
+
+use crate::{
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
+    search_core::{
+        KnotResult, SearchFailure, SearchRecord, gridstate_finder_commute, gridstate_finder_stab,
+    },
+};
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
     "12n_79", "12n_168", "13n_282", "13n_917", "13n_1279", "13n_1281", "13n_1413", "13n_1826",
@@ -83,8 +91,10 @@ fn main() {
             .collect(),
         "all" => get_all_knot_names(&csv),
         string
-            if let Some(parsed_num) =
-                string.strip_suffix("%").map(|a| a.parse::<i32>().ok()).flatten() =>
+            if let Some(parsed_num) = string
+                .strip_suffix("%")
+                .map(|a| a.parse::<i32>().ok())
+                .flatten() =>
         {
             let knots = get_all_knot_names(&csv);
             knots[..(knots.len() * (parsed_num / 100) as usize)].to_vec()
@@ -107,8 +117,7 @@ fn main() {
             .unwrap();
     }
 
-    let mut positive_results = 0;
-    let mut negative_results = 0;
+    let mut results = vec![];
 
     let search_function = match args.algorithm.as_str() {
         "stab" => gridstate_finder_stab,
@@ -126,29 +135,108 @@ fn main() {
             }
         }
 
-        let search_record = search_function(vertlist, args.depth, &logging_type);
+        let mut search_record = search_function(vertlist, args.depth, &logging_type);
         if matches!(logging_type, LoggingType::SingleLine) {
             println!("");
         }
 
-        if let Ok(mut record) = search_record {
-            positive_results += 1;
-            if log_positives {
-                println!("Found nice knot for: {}, #{}", knot, i);
-                record.knot = Some(knot);
+        match &mut search_record {
+            Ok(record) => {
+                if log_positives {
+                    println!("Found nice knot for: {}", knot);
+                }
             }
-        } else {
-            negative_results += 1;
-            if log_negatives {
-                println!("Could not find nice knot for {}, #{}", knot, i);
+            Err(_) => {
+                if log_negatives {
+                    println!("Could not find nice knot for {}.", knot)
+                }
             }
         }
+        results.push(KnotResult {
+            search_record,
+            knot,
+        });
     }
 
     if !args.hide_analytics {
-        println!("========= Analytics =========");
-        println!("Total: {}", total_length);
-        println!("Positive results: {}   {}%", positive_results, (100 * positive_results) /  total_length);
-        println!("Negative results: {}   {}%", negative_results, (100 *  negative_results) / total_length);
+        compute_analytics(&results);
     }
+    if let Some(output_dir) = args.output_dir {
+        save_results(output_dir, &results);
+    }
+}
+
+fn compute_analytics(results: &Vec<KnotResult>) {
+    println!("========= Analytics =========");
+    let total_length = results.len();
+    println!("Total: {}", total_length);
+
+    let (positive_results, frontier_error, depth_error) = results
+        .iter()
+        .map(|result| match result {
+            KnotResult {
+                search_record: Ok(_),
+                knot: _,
+            } => (1, 0, 0),
+            KnotResult {
+                search_record: Err(SearchFailure::ExaustedSearchSpace),
+                knot: _,
+            } => (0, 1, 0),
+            KnotResult {
+                search_record: Err(SearchFailure::HitDepthLimit),
+                knot: _,
+            } => (0, 0, 1),
+        })
+        .reduce(|(x1, y1, z1), (x2, y2, z2)| (x1 + x2, y1 + y2, z1 + z2))
+        .unwrap();
+
+    println!(
+        "Positive results: {}   {}%",
+        positive_results,
+        (100 * positive_results) / total_length
+    );
+    println!(
+        "Negative results: {}   {}%",
+        frontier_error + depth_error,
+        (100 * (frontier_error + depth_error)) / total_length
+    );
+    println!(
+        "   Depth error: {}   {}%",
+        depth_error,
+        (100 * depth_error) / total_length
+    );
+    println!(
+        "   Frontier error: {}   {}%",
+        frontier_error,
+        (100 * frontier_error) / total_length
+    );
+}
+
+fn save_results(file_name: String, results: &Vec<KnotResult>) {
+    let mut ok_vec = vec![];
+    let mut depth_err_vec = vec![];
+    let mut space_err_vec = vec![];
+    for result in results {
+        match result {
+            KnotResult {
+                search_record: Ok(_),
+                knot: _,
+            } => ok_vec.push(result),
+            KnotResult {
+                search_record: Err(SearchFailure::HitDepthLimit),
+                knot,
+            } => depth_err_vec.push(knot),
+            KnotResult {
+                search_record: Err(SearchFailure::ExaustedSearchSpace),
+                knot,
+            } => space_err_vec.push(knot),
+        }
+    }
+    let map = json!({
+        "positives": ok_vec,
+        "depth_error": depth_err_vec,
+        "search_space_exahusted_error": space_err_vec 
+    });
+
+    let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
 }
