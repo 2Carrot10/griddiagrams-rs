@@ -338,7 +338,7 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
     let size = vertlist.0.len();
     let mut result = vec![];
     for i in 0..size {
-        let mut row: Vec<i32> = vec![0];
+        let mut row = vec![0];
         for j in 0..(size - 1) {
             let (tail, head) = vertlist.0[j];
 
@@ -375,42 +375,58 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
         Dir::Horz => "h-type-0",
         Dir::Vert => "v-type-0",
     };
-    let mut min_indices: Vec<HashSet<usize>> = matrix
+    let mut min_indices: Vec<Option<HashSet<usize>>> = matrix
         .into_iter()
         .map(|row| {
             let min = row.iter().min().unwrap();
             row.iter()
                 .enumerate()
                 .filter(|(_, val)| val == &min)
-                .map(|(index, _)| index)
+                .map(|(index, _)| Some(index))
                 .collect()
         })
         .collect();
     let mut result = vec![None; n];
 
-    while min_indices.iter().any(|s| !s.is_empty()) {
-        match min_indices
+    while min_indices.iter().any(|s| s.is_some()) {
+        let singleton_index = min_indices
             .iter()
             .enumerate()
-            .filter(|(_, val)| val.len() == 1)
+            .filter(|(_, val)| val.as_ref().map_or(false, |a| a.len() == 1)) // Find unique entry
             .map(|(index, _)| index)
-            .next()
-        {
+            .next();
+
+        match singleton_index {
             None => {
                 return Err(String::from(format!(
                     "No unique {} permutation exists.",
                     type_string
                 )));
             }
-            Some(first_elem) => {
-                let x = min_indices[first_elem].iter().next().unwrap().clone();
-                result[first_elem] = Some(x.clone());
+            Some(singleton_index) => {
+                // X is the first element in the singleton set
+                let x = min_indices[singleton_index]
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .clone();
 
-                for s in &mut min_indices {
-                    s.remove(&x);
-                }
+                result[singleton_index] = Some(x.clone());
 
-                if min_indices.is_empty() {
+                min_indices.iter_mut().for_each(|a| {
+                    if let Some(s) = a {
+                        s.remove(&x);
+                    }
+                });
+
+                min_indices[singleton_index] = None;
+
+                if min_indices
+                    .iter()
+                    .any(|s| s.as_ref().map_or(false, |a| a.is_empty()))
+                {
                     return Err(String::from(format!(
                         "No unique {} permutation exists.",
                         type_string
@@ -420,12 +436,12 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
         }
     }
 
-    if result.is_empty() {
-        return Err(String::from(
-            "This should never happen, check code if it does.",
-        ));
-    }
-    return Ok(result.into_iter().flatten().collect());
+    let result: Vec<usize> = result
+        .into_iter()
+        .map(|a| a.expect("This should never happen, check code if it does."))
+        .collect();
+
+    return Ok(result);
 }
 
 /// Reverse the orientation of a knot diagram.
@@ -550,7 +566,7 @@ pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
 /// checking for both horizontal and vertical perfect grid states.
 pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
     // try_instance_permutations Does not attempt reversed
-    fn try_instance_permutations(vertlist: DirList) -> Option<SearchRecord> {
+    fn try_instance_permutations(vertlist: DirList, is_reversed: bool) -> Option<SearchRecord> {
         let matrix = w_matrix(vertlist.clone());
         let rowsum = matrix
             .clone()
@@ -571,20 +587,29 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                     alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
                     matrix: matrix.clone(),
                     gridstate: h_perm.clone(),
-                    perm_type: String::from("h_type_0"),
+                    perm_type: if is_reversed {
+                        String::from("h_type_0")
+                    } else {
+                        String::from("h_type_0_rev")
+                    },
                 });
             }
         }
 
         if colsum >= rowsum {
             if let Ok(v_perm) = type_0_permutation(matrix.clone(), Dir::Vert) {
+                let h_perm = vperm_to_hperm(v_perm);
                 return Some(SearchRecord {
                     stabilizations: 2,
                     vlist: vertlist.clone(),
-                    alexander_grading: a_grading(&vertlist, &matrix, &v_perm),
+                    alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
                     matrix: matrix.clone(),
-                    gridstate: v_perm.clone(),
-                    perm_type: String::from("v_type_0"),
+                    gridstate: h_perm.clone(),
+                    perm_type: if is_reversed {
+                        String::from("v_type_0")
+                    } else {
+                        String::from("v_type_0_rev")
+                    },
                 });
             }
         }
@@ -592,9 +617,9 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
         None
     }
 
-    if let Some(p) = try_instance_permutations(vertlist.clone()) {
+    if let Some(p) = try_instance_permutations(vertlist.clone(), false) {
         Some(p)
-    } else if let Some(p) = try_instance_permutations(rev(vertlist.clone())) {
+    } else if let Some(p) = try_instance_permutations(rev(vertlist.clone()), true) {
         Some(p)
     } else {
         None
@@ -681,7 +706,7 @@ pub enum SearchFailure {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KnotResult {
     pub knot: String,
-    pub search_record: Result<SearchRecord, SearchFailure>
+    pub search_record: Result<SearchRecord, SearchFailure>,
 }
 
 fn gridstate_log(

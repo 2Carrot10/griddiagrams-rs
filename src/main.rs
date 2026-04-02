@@ -141,14 +141,14 @@ fn main() {
         }
 
         match &mut search_record {
-            Ok(record) => {
+            Ok(_) => {
                 if log_positives {
                     println!("Found nice knot for: {}", knot);
                 }
             }
             Err(_) => {
                 if log_negatives {
-                    println!("Could not find nice knot for {}.", knot)
+                    println!("Could not find nice knot for {}", knot)
                 }
             }
         }
@@ -231,11 +231,14 @@ fn save_results(file_name: String, results: &Vec<KnotResult>) {
                 knot,
             } => space_err_vec.push(knot),
         }
-    }
+    };
+    let command = std::env::args().collect::<Vec<String>>().join(" ");
     let map = json!({
         "positives": ok_vec,
+        "positives": ok_vec,
         "depth_error": depth_err_vec,
-        "search_space_exahusted_error": space_err_vec 
+        "search_space_exahusted_error": space_err_vec ,
+        "command": command
     });
 
     let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
