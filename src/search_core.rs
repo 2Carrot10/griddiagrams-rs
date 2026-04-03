@@ -691,7 +691,7 @@ pub fn gridstate_finder_commute(
     n: i32,
     logging: &LoggingType,
 ) -> Result<SearchRecord, SearchFailure> {
-    _gridstate_finder_commute_with_visited(vec![vertlist], n, logging)
+    _gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -717,7 +717,7 @@ pub struct KnotResult {
 }
 
 fn gridstate_log(
-    current_states: &Vec<DirList>,
+    current_states: &HashSet<DirList>,
     iteration: i32,
     previous_states_len: usize,
     single_line: bool,
@@ -733,28 +733,18 @@ fn gridstate_log(
         "-".repeat(30 - format_blocks)
     );
     print!("Ratio change: {:.2}%", 100.0 * ratio);
-    /*
-    if commutations_num.len() == 0 {
-        print!("   Average commutations: NaN");
-    } else {
-        print!(
-            "   Average commutations: {}",
-            commutations_num.iter().sum::<f32>() / commutations_num.len() as f32
-        );
-    }
-    */
 
     if single_line {
         print!("\r");
-        io::stdout().flush();
+        let _ = io::stdout().flush();
     } else {
-        print!("\n"); // Autoflushes
+        print!("\n"); // Auto flushes
     }
 }
 
 /// Helper function: gridstate_finder_commute that respects a global visited set.
 pub fn _gridstate_finder_commute_with_visited(
-    vertlists: Vec<DirList>,
+    vertlists: HashSet<DirList>,
     n: i32,
     logging: &LoggingType,
 ) -> Result<SearchRecord, SearchFailure> {
@@ -762,7 +752,7 @@ pub fn _gridstate_finder_commute_with_visited(
     let single_line = matches!(logging, LoggingType::SingleLine);
 
     let mut current_states = vertlists;
-    let mut previous_states = vec![]; // Only keeps the last iteration
+    let mut previous_states = HashSet::new(); // Only keeps the last iteration
     for i in 0..n {
         if let Some(record) = current_states
             .par_iter()
@@ -780,7 +770,7 @@ pub fn _gridstate_finder_commute_with_visited(
             .par_iter()
             .flat_map(|r| knot_commute(&r))
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
 
         if current_states.is_empty() {
             return Err(SearchFailure::ExaustedSearchSpace);
@@ -803,7 +793,7 @@ pub fn gridstate_finder_stab(
             grid_stab_combos.push((segment, dir, index));
         }
     }
-    let gridstates_after_stab: Vec<_> = grid_stab_combos
+    let gridstates_after_stab: HashSet<_> = grid_stab_combos
         .into_iter()
         .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
         .collect();
