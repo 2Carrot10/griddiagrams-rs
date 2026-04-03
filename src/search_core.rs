@@ -59,7 +59,7 @@ impl<'de> Deserialize<'de> for GridNotationContainer {
 
 // Either VertList or HorzList
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct DirList(Vec<(i32, i32)>);
+pub struct DirList(pub Vec<(i32, i32)>);
 
 pub enum StabDir {
     NorthWest,
@@ -284,12 +284,16 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
     }
 
     // Try wrap-around commutation
-    if can_commute(input_list.0[0], input_list.0[input_list.0.len() - 1]) {
+    let index = input_list.0.len() - 1;
+    println!("b4: 1 {:?}", input_list.0[0]);
+    println!("b4: 2 {:?}", input_list.0[index]);
+    if can_commute(input_list.0[0], input_list.0[index]) {
+        println!("Can commute!!");
         let mut swapped_list = input_list.clone();
-        let a = swapped_list.0[swapped_list.0.len() - 1].clone();
-        let b = swapped_list.0[0].clone();
+
+        let a = swapped_list.0[index];
+        let b = swapped_list.0[0];
         swapped_list.0[0] = a;
-        let index = swapped_list.0.len() - 1;
         swapped_list.0[index] = b;
 
         if !seen.contains(&swapped_list.0) {
@@ -764,6 +768,14 @@ pub fn _gridstate_finder_commute_with_visited(
     let mut current_states = vertlists;
     let mut previous_states = HashSet::new(); // Only keeps the last iteration
     for i in 0..n {
+        if let Some(record) = current_states
+            .par_iter()
+            .filter_map(try_permutations)
+            .find_any(|_| true)
+        {
+            return Ok(record);
+        }
+
         if do_logging {
             gridstate_log(&current_states, i, previous_states.len(), single_line);
         }
@@ -773,14 +785,6 @@ pub fn _gridstate_finder_commute_with_visited(
             .flat_map(|r| knot_commute(&r))
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
             .collect::<HashSet<_>>();
-
-        if let Some(record) = current_states
-            .par_iter()
-            .filter_map(try_permutations)
-            .find_any(|_| true)
-        {
-            return Ok(record);
-        }
 
         if current_states.is_empty() {
             return Err(SearchFailure::ExaustedSearchSpace);

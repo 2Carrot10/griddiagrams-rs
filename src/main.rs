@@ -12,7 +12,7 @@ use serde_json::{json, Map};
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
     search_core::{
-        KnotResult, SearchFailure, SearchRecord, gridstate_finder_commute, gridstate_finder_stab,
+        c_move, gridstate_finder_commute, gridstate_finder_stab, KnotResult, SearchFailure, SearchRecord
     },
 };
 
@@ -143,12 +143,17 @@ fn main() {
         match &mut search_record {
             Ok(_) => {
                 if log_positives {
-                    println!("Found nice knot for: {}", knot);
+                    println!("Found nice knot for: {}, #{}", knot, i);
                 }
             }
-            Err(_) => {
+            Err(SearchFailure::HitDepthLimit) => {
                 if log_negatives {
-                    println!("Could not find nice knot for {}", knot)
+                    println!("Could not find nice knot for {}, #{} (depth limit error)", knot, i);
+                }
+            }
+            Err(SearchFailure::ExaustedSearchSpace) => {
+                if log_negatives {
+                    println!("Could not find nice knot for {}, #{} (search space error)", knot, i);
                 }
             }
         }
