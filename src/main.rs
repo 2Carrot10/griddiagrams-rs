@@ -158,7 +158,7 @@ fn main() {
         });
     }
 
-    if !args.hide_analytics {
+    if !args.hide_analytics && total_length != 1 {
         compute_analytics(&results);
     }
     if let Some(output_dir) = args.output_dir {

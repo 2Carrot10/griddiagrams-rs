@@ -370,11 +370,18 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
 // List[int] or str
 //     Permutation if unique one exists, error message otherwise.
 pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permutation, String> {
+    let matrix = if let Dir::Vert = direction {
+       transpose(matrix)
+    } else {
+        matrix
+    };
+
     let n = matrix.len();
     let type_string = match direction {
         Dir::Horz => "h-type-0",
         Dir::Vert => "v-type-0",
     };
+
     let mut min_indices: Vec<Option<HashSet<usize>>> = matrix
         .into_iter()
         .map(|row| {
