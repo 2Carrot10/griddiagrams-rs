@@ -7,12 +7,12 @@ mod tests;
 use std::fs;
 
 use clap::Parser;
-use serde_json::{json, Map};
+use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
     search_core::{
-        c_move, gridstate_finder_commute, gridstate_finder_stab, KnotResult, SearchFailure, SearchRecord
+        gridstate_finder_commute, gridstate_finder_stab, KnotResult, SearchFailure
     },
 };
 
@@ -124,6 +124,7 @@ fn main() {
         "commute" => gridstate_finder_commute,
         _ => panic!("Could not read algorithm type"),
     };
+
     let total_length = knot_names.len();
     for (i, knot) in knot_names.into_iter().enumerate() {
         let vertlist = get_vlist_by_name(knot.to_string(), &csv);

@@ -1,11 +1,9 @@
 use std::cmp::{max, min};
-use std::collections::HashSet;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::iter;
-use std::ops::Deref;
 
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -264,7 +262,7 @@ pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
 
 pub fn c_move(input_list: &DirList) -> Vec<DirList> {
     let mut result = vec![];
-    let mut seen = HashSet::new();
+    let mut seen = vec![];
 
     let n = input_list.0.len();
 
@@ -277,7 +275,7 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
             swapped_list.0[i + 1] = b;
 
             if !seen.contains(&swapped_list.0) {
-                seen.insert(swapped_list.0.clone());
+                seen.push(swapped_list.0.clone());
                 result.push(swapped_list.clone());
             }
         }
@@ -294,7 +292,7 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
         swapped_list.0[index] = b;
 
         if !seen.contains(&swapped_list.0) {
-            seen.insert(swapped_list.0.clone());
+            seen.push(swapped_list.0.clone());
             result.push(swapped_list.clone());
         }
     }
@@ -309,10 +307,10 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
 //     todo!()
 // }
 
-pub fn knot_commute(vertlist: &DirList) -> HashSet<DirList> {
+pub fn knot_commute(vertlist: &DirList) -> Vec<DirList> {
     let v_commutations = c_move(vertlist);
     let h_commutations = c_move(&v_to_h(vertlist)); // Bad clone
-    let mut h_to_v_commutations: HashSet<DirList> =
+    let mut h_to_v_commutations: Vec<DirList> =
         h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
 
     h_to_v_commutations.extend(v_commutations);
@@ -383,7 +381,7 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
         Dir::Vert => "v-type-0",
     };
 
-    let mut min_indices: Vec<Option<HashSet<usize>>> = matrix
+    let mut min_indices: Vec<Option<Vec<usize>>> = matrix
         .into_iter()
         .map(|row| {
             let min = row.iter().min().unwrap();
@@ -425,7 +423,7 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
 
                 min_indices.iter_mut().for_each(|a| {
                     if let Some(s) = a {
-                        s.remove(&x);
+                        s.remove(x);
                     }
                 });
 
@@ -692,7 +690,7 @@ pub fn gridstate_finder_commute(
     n: i32,
     logging: &LoggingType,
 ) -> Result<SearchRecord, SearchFailure> {
-    _gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
+    _gridstate_finder_commute_with_visited(vec![vertlist], n, logging)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -718,7 +716,7 @@ pub struct KnotResult {
 }
 
 fn gridstate_log(
-    current_states: &HashSet<DirList>,
+    current_states: &Vec<DirList>,
     iteration: i32,
     previous_states_len: usize,
     single_line: bool,
@@ -755,7 +753,7 @@ fn gridstate_log(
 
 /// Helper function: gridstate_finder_commute that respects a global visited set.
 pub fn _gridstate_finder_commute_with_visited(
-    vertlists: HashSet<DirList>,
+    vertlists: Vec<DirList>,
     n: i32,
     logging: &LoggingType,
 ) -> Result<SearchRecord, SearchFailure> {
@@ -763,7 +761,7 @@ pub fn _gridstate_finder_commute_with_visited(
     let single_line = matches!(logging, LoggingType::SingleLine);
 
     let mut current_states = vertlists;
-    let mut previous_states = HashSet::new(); // Only keeps the last iteration
+    let mut previous_states = vec![]; // Only keeps the last iteration
     for i in 0..n {
         if let Some(record) = current_states
             .par_iter()
@@ -781,7 +779,7 @@ pub fn _gridstate_finder_commute_with_visited(
             .par_iter()
             .flat_map(|r| knot_commute(&r))
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
-            .collect::<HashSet<_>>();
+            .collect::<Vec<_>>();
 
         if current_states.is_empty() {
             return Err(SearchFailure::ExaustedSearchSpace);
@@ -804,7 +802,7 @@ pub fn gridstate_finder_stab(
             grid_stab_combos.push((segment, dir, index));
         }
     }
-    let gridstates_after_stab: HashSet<_> = grid_stab_combos
+    let gridstates_after_stab: Vec<_> = grid_stab_combos
         .into_iter()
         .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
         .collect();
