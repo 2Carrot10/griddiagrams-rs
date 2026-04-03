@@ -1,4 +1,5 @@
 use std::cmp::{max, min};
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::iter;
@@ -381,7 +382,7 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
         Dir::Vert => "v-type-0",
     };
 
-    let mut min_indices: Vec<Option<Vec<usize>>> = matrix
+    let mut min_indices: Vec<Option<HashSet<usize>>> = matrix
         .into_iter()
         .map(|row| {
             let min = row.iter().min().unwrap();
@@ -423,7 +424,7 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
 
                 min_indices.iter_mut().for_each(|a| {
                     if let Some(s) = a {
-                        s.remove(x);
+                        s.remove(&x);
                     }
                 });
 
