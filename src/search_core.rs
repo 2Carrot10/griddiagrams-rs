@@ -286,7 +286,6 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
     // Try wrap-around commutation
     let index = input_list.0.len() - 1;
     if can_commute(input_list.0[0], input_list.0[index]) {
-        println!("Can commute!!");
         let mut swapped_list = input_list.clone();
 
         let a = swapped_list.0[index];
