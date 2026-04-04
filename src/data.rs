@@ -1,6 +1,6 @@
 use csv;
 use serde;
-use crate::search_core::{gridnotation_to_gridlist, vlist, DirList, GridNotation, GridNotationContainer};
+use crate::knot_core::{gridnotation_to_gridlist, vlist, DirList, GridNotation, GridNotationContainer};
 type Csv = Vec<Record>;
 
 pub const RAW_CSV: &str = include_str!("../data/knotinfo.csv");

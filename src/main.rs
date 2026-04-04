@@ -1,19 +1,20 @@
 #![feature(if_let_guard)]
 mod data;
+mod knot_core;
 mod plotting;
+mod reidemiester;
 mod search;
-mod search_core;
 mod tests;
+
 use std::fs;
 
 use clap::Parser;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    search_core::{
-        gridstate_finder_commute, gridstate_finder_stab, KnotResult, SearchFailure
-    },
+    search::{KnotResult, SearchFailure, gridstate_finder_commute, gridstate_finder_stab},
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -21,16 +22,28 @@ const UNSOLVED_KNOT_NAMES: [&str; 12] = [
     "13n_2915", "13n_3089", "13n_3904", "13n_3932",
 ];
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(version, about, long_about = None)]
 struct Args {
-    ///
     #[arg(short, long)]
-    output_dir: Option<String>,
+    output: Option<String>,
 
-    /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas, a
-    /// range "<start> - <end>", a percentage of the dataset to use "<percent>%".
-    /// (i.e. 12n_79, 12n_168, 13n_282, 13n_917)
+    /// TODO: unimplemented
+    /// Only used optionally in combination with the  `--knots rest`. If this value is undefined,
+    /// `--knots rest` will refer to the output file if it already exists, mutating it in the
+    /// process.
+    #[arg(short, long)]
+    input: Option<String>,
+
+    /// TODO: unimplemented
+    /// The file to use in place of command flags. Used to avoid repeatedly writing out long commands.
+    #[arg(short, long)]
+    config: Option<String>,
+
+    /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas
+    /// (e.g. 12n_79, 12n_168, 13n_282, 13n_917), a range "<start> - <end>", a percentage of
+    /// the dataset to use "<percent>%", "rest" representing the knots of the output which have
+    /// not yet been solved.
     #[arg(short, long, default_value_t = String::from("unsolved"))]
     knots: String,
 
@@ -90,6 +103,13 @@ fn main() {
             .map(|a| a.to_string())
             .collect(),
         "all" => get_all_knot_names(&csv),
+        "rest" => get_rest_from_results(if let Some(input) = args.input {
+            input
+        } else if let Some(output) = &args.output {
+            output.clone()
+        } else {
+            panic!("Rest requires an input or output file")
+        }),
         string
             if let Some(parsed_num) = string
                 .strip_suffix("%")
@@ -149,12 +169,18 @@ fn main() {
             }
             Err(SearchFailure::HitDepthLimit) => {
                 if log_negatives {
-                    println!("Could not find nice knot for {}, #{} (depth limit error)", knot, i);
+                    println!(
+                        "Could not find nice knot for {}, #{} (depth limit error)",
+                        knot, i
+                    );
                 }
             }
             Err(SearchFailure::ExaustedSearchSpace) => {
                 if log_negatives {
-                    println!("Could not find nice knot for {}, #{} (search space error)", knot, i);
+                    println!(
+                        "Could not find nice knot for {}, #{} (search space error)",
+                        knot, i
+                    );
                 }
             }
         }
@@ -167,7 +193,7 @@ fn main() {
     if !args.hide_analytics && total_length != 1 {
         compute_analytics(&results);
     }
-    if let Some(output_dir) = args.output_dir {
+    if let Some(output_dir) = args.output {
         save_results(output_dir, &results);
     }
 }
@@ -237,7 +263,7 @@ fn save_results(file_name: String, results: &Vec<KnotResult>) {
                 knot,
             } => space_err_vec.push(knot),
         }
-    };
+    }
     let command = std::env::args().collect::<Vec<String>>().join(" ");
     let map = json!({
         "positives": ok_vec,
@@ -248,4 +274,18 @@ fn save_results(file_name: String, results: &Vec<KnotResult>) {
     });
 
     let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
+}
+
+fn get_rest_from_results(file_name: String) -> Vec<String> {
+    let a = serde_json::from_str::<serde_json::Map<_, _>>(
+        str::from_utf8(&fs::read(file_name).unwrap()).unwrap(),
+    )
+    .unwrap();
+
+    let mut positives: Vec<KnotResult> =
+        serde_json::from_value(a.get("search_space_exahusted_error").unwrap().clone()).unwrap();
+    let depth_error: Vec<KnotResult> =
+        serde_json::from_value(a.get("depth_error").unwrap().clone()).unwrap();
+    positives.extend(depth_error);
+    positives.into_iter().map(|a| a.knot).collect()
 }
