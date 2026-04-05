@@ -5,38 +5,61 @@ use crate::{
     reidemiester::{knot_commute, knot_stab, knot_switch},
 };
 use regex::Regex;
-#[derive(Clone)]
-struct RepeatSearchType {
-    pub count: i32,
-    pub next: Rc<Vec<SearchType>>,
+#[derive(Clone, Debug)]
+struct ListSearchType {
+    pub contains: Box<Vec<SearchType>>,
     curr: usize,
 }
 
-impl RepeatSearchType {
+impl ListSearchType {
     pub fn next(&mut self) -> Option<fn(&DirList) -> Vec<DirList>> {
-        if self.count == 0 {
-            return None;
-        } else if self.curr < self.next.len() {
-            self.count += 1;
+        if self.curr < self.contains.len() {
+            let mut result = self.contains[self.curr].clone();
+            self.curr += 1;
+            result.next()
         } else {
-            self.count -= 1;
-            self.curr = 0;
-        }
-        match self.next[self.curr].clone() {
-            SearchType::Function(f) => Some(f.clone()),
-            SearchType::RepeatSearchType(mut r) => r.next(),
+            None
         }
     }
 }
 
-#[derive(Clone)]
-enum SearchType {
-    Function(fn(&DirList) -> Vec<DirList>),
-    RepeatSearchType(RepeatSearchType),
+#[derive(Clone, Debug)]
+struct RepeatSearchType {
+    pub count: i32,
+    pub contains: Box<SearchType>,
+    curr: i32,
 }
 
-#[derive(Clone)]
-pub struct KnotFinder(RepeatSearchType);
+impl RepeatSearchType {
+    pub fn next(&mut self) -> Option<fn(&DirList) -> Vec<DirList>> {
+        if self.curr < self.count {
+            self.curr += 1;
+            self.contains.next()
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum SearchType {
+    Function(fn(&DirList) -> Vec<DirList>),
+    Repeat(RepeatSearchType),
+    List(ListSearchType),
+}
+
+impl SearchType {
+    pub fn next(&mut self) -> Option<fn(&DirList) -> Vec<DirList>> {
+        match self {
+            SearchType::Function(f) => Some(*f),
+            SearchType::Repeat(f) => f.next(),
+            SearchType::List(f) => f.next(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct KnotFinder(SearchType);
 
 impl KnotFinder {
     pub fn next(&mut self) -> Option<fn(&DirList) -> Vec<DirList>> {
@@ -44,11 +67,11 @@ impl KnotFinder {
     }
 
     pub fn build(depth: i32, function: fn(&DirList) -> Vec<DirList>) -> KnotFinder {
-        KnotFinder(RepeatSearchType {
-            next: Rc::new(vec![SearchType::Function(function)]),
+        KnotFinder(SearchType::Repeat(RepeatSearchType {
+            contains: Box::new(SearchType::Function(function)),
             count: depth,
             curr: 0,
-        })
+        }))
     }
 }
 
@@ -74,11 +97,14 @@ pub fn read_to_knot_finder(filename: String) -> KnotFinder {
         .find_iter(text)
         .map(|capture| capture.as_str().to_string())
         .collect();
-    KnotFinder(parse_expr(&mut tokens.into_iter().peekable()).unwrap())
+    let a = KnotFinder(parse_expr(&mut tokens.into_iter().peekable()).unwrap());
+    println!("{:?}", a);
+    a
 }
 
-// Matches something like (destab 10)
-fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<RepeatSearchType> {
+// Matches something like (destab) 10
+fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
+    println!("New");
     let mut ls = vec![];
     loop {
         let name = tokens.peek();
@@ -100,30 +126,29 @@ fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Repea
                 }
                 "(" => {
                     tokens.next();
-                    let t = parse_expr(tokens).unwrap();
-                    println!("Okie {:?}", tokens.peek());
-
-                    let count: i32 = tokens.next().unwrap().parse().unwrap();
-                    let result = Some(RepeatSearchType {
-                        count,
-                        next: Rc::new(vec![SearchType::RepeatSearchType(t)]),
-                        curr: 0,
-                    });
+                    let parse = parse_expr(tokens).unwrap();
+                    println!("And now {:?}", tokens.peek());
                     assert_eq!(tokens.next(), Some(")".to_string()));
-                    return result;
-                    
+
+                    println!("Num now {:?}", tokens.peek());
+                    let count: i32 = tokens.next().unwrap().parse().unwrap();
+                    SearchType::Repeat(RepeatSearchType {
+                        count: count,
+                        contains: Box::new(parse),
+                        curr: 0,
+                    })
                 }
                 _ => break,
             },
         };
         ls.push(function);
     }
+    println!("Break with {:?}", tokens.peek());
 
-    Some(RepeatSearchType {
-        count: 1,
-        next: Rc::new(ls),
+    Some(SearchType::List(ListSearchType {
+        contains: Box::new(ls),
         curr: 0,
-    })
+    }))
 }
 
 pub fn consume_if_equals(
