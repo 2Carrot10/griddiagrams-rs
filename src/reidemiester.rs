@@ -119,6 +119,7 @@ pub fn switch_move(input_list: &DirList) -> Vec<DirList> {
     result
 }
 
+// All of these can contain duplicates
 pub fn knot_switch(vertlist: &DirList) -> Vec<DirList> {
     let v_commutations = switch_move(vertlist);
     let h_commutations = switch_move(&v_to_h(vertlist)); // Bad clone
@@ -147,11 +148,10 @@ pub fn knot_stab(input_list: &DirList) -> Vec<DirList> {
         }
     }
     // TODO: fix suboptimal HashSet -> Vec conversion
-    let gridstates_after_stab: HashSet<_> = grid_stab_combos
+    grid_stab_combos
         .into_iter()
         .map(|(segment, dir, index)| stabilize(input_list.clone(), segment, dir, index))
-        .collect();
-    gridstates_after_stab.into_iter().collect()
+        .collect()
 }
 
 

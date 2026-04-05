@@ -5,7 +5,6 @@ use std::iter;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::reidemiester::StabDir;
 use crate::search::SearchRecord;
 
 pub type GridNotation = Vec<Vec<i32>>;

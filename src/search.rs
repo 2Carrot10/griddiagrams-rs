@@ -3,33 +3,7 @@ use std::{cmp::min, collections::HashSet, io::{self, Write}};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
-use crate::{knot_core::{try_permutations, DirList, Permutation, WindingMatrix}, reidemiester::{knot_commute, stabilize, STAB_COMBINATIONS}, LoggingType};
-
-
-/// Find unique perfect grid states through commutation moves.
-///   
-/// Parameters
-/// ----------
-/// vertlist : List[Tuple[int, int]]
-///     Initial vertical segment list.
-/// n : int
-///     Maximum number of commutation iterations.
-///
-/// Returns
-/// -------
-/// Optional[Dict]
-///     Dictionary containing grid state information if found, None otherwise.
-///     
-/// Notes
-/// -----
-/// We use a breadth-first search approach to explore commutation space.
-pub fn gridstate_finder_commute(
-    vertlist: DirList,
-    n: i32,
-    logging: &LoggingType,
-) -> Result<SearchRecord, SearchFailure> {
-    gridstate_finder_commute_with_visited(HashSet::from([vertlist]), n, logging)
-}
+use crate::{knot_core::{try_permutations, DirList, Permutation, WindingMatrix}, meta_knot_finder::KnotFinder, LoggingType};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchRecord {
@@ -55,17 +29,18 @@ pub struct KnotResult {
 
 
 /// Helper function: gridstate_finder_commute that respects a global visited set.
-pub fn gridstate_finder_commute_with_visited(
+pub fn manaual_gridstate_finder(
     vertlists: HashSet<DirList>,
-    n: i32,
     logging: &LoggingType,
+    mut knot_finder: KnotFinder
 ) -> Result<SearchRecord, SearchFailure> {
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::SingleLine);
 
     let mut current_states = vertlists;
     let mut previous_states = HashSet::new(); // Only keeps the last iteration
-    for i in 0..n {
+    let mut i = 0;
+    while let Some(knot_finding_function) = knot_finder.next() {
         if let Some(record) = current_states
             .par_iter()
             .filter_map(try_permutations)
@@ -80,7 +55,7 @@ pub fn gridstate_finder_commute_with_visited(
 
         current_states = current_states
             .par_iter()
-            .flat_map(|r| knot_commute(&r))
+            .flat_map(|r| knot_finding_function(&r))
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
             .collect::<HashSet<_>>();
 
@@ -89,35 +64,36 @@ pub fn gridstate_finder_commute_with_visited(
         }
 
         previous_states.extend(current_states.clone());
+        i += 1;
     }
 
     Err(SearchFailure::HitDepthLimit)
 }
 
-pub fn gridstate_finder_stab(
-    vertlist: DirList,
-    n: i32,
-    logging: &LoggingType,
-) -> Result<SearchRecord, SearchFailure> {
-    let mut grid_stab_combos = vec![];
-    for segment in vertlist.0.clone() {
-        for (index, dir) in STAB_COMBINATIONS {
-            grid_stab_combos.push((segment, dir, index));
-        }
-    }
-    let gridstates_after_stab: HashSet<_> = grid_stab_combos
-        .into_iter()
-        .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
-        .collect();
-
-    let mut result = gridstate_finder_commute_with_visited(gridstates_after_stab, n, logging);
-
-    if let Ok(ref mut record) = result {
-        record.stabilizations = 1;
-    }
-
-    result
-}
+// pub fn gridstate_finder_stab(
+//     vertlist: DirList,
+//     n: i32,
+//     logging: &LoggingType,
+// ) -> Result<SearchRecord, SearchFailure> {
+//     let mut grid_stab_combos = vec![];
+//     for segment in vertlist.0.clone() {
+//         for (index, dir) in STAB_COMBINATIONS {
+//             grid_stab_combos.push((segment, dir, index));
+//         }
+//     }
+//     let gridstates_after_stab: HashSet<_> = grid_stab_combos
+//         .into_iter()
+//         .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
+//         .collect();
+// 
+//     let mut result = manaual_gridstate_finder(gridstates_after_stab, n, logging, knot_commute);
+// 
+//     if let Ok(ref mut record) = result {
+//         record.stabilizations = 1;
+//     }
+// 
+//     result
+// }
 
 fn gridstate_log(
     current_states: &HashSet<DirList>,

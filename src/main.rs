@@ -5,16 +5,16 @@ mod plotting;
 mod reidemiester;
 mod search;
 mod tests;
+mod meta_knot_finder;
 
-use std::fs;
+use std::{collections::HashSet, fs};
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    search::{KnotResult, SearchFailure, gridstate_finder_commute, gridstate_finder_stab},
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, meta_knot_finder::{read_to_knot_finder, KnotFinder}, reidemiester::{knot_commute, knot_stab}, search::{manaual_gridstate_finder, KnotResult, SearchFailure}
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -139,10 +139,10 @@ fn main() {
 
     let mut results = vec![];
 
-    let search_function = match args.algorithm.as_str() {
-        "stab" => gridstate_finder_stab,
-        "commute" => gridstate_finder_commute,
-        _ => panic!("Could not read algorithm type"),
+    let knot_finder = match args.algorithm.as_str() {
+        "stab" => KnotFinder::build(args.depth, knot_stab),
+        "commute" => KnotFinder::build(args.depth, knot_commute),
+        filename => read_to_knot_finder(filename.to_string()),
     };
 
     let total_length = knot_names.len();
@@ -156,7 +156,7 @@ fn main() {
             }
         }
 
-        let mut search_record = search_function(vertlist, args.depth, &logging_type);
+        let mut search_record = manaual_gridstate_finder(HashSet::from([vertlist]), &logging_type, knot_finder.clone());
         if matches!(logging_type, LoggingType::SingleLine) {
             println!("");
         }
