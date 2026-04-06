@@ -1,9 +1,18 @@
-use std::{cmp::min, collections::HashSet, io::{self, Write}};
+use std::{
+    cmp::min,
+    collections::HashSet,
+    io::{self, Write},
+};
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
-use crate::{knot_core::{try_permutations, DirList, Permutation, WindingMatrix}, meta_knot_finder::KnotFinder, LoggingType};
+use crate::{
+    LoggingType,
+    knot_core::{DirList, Permutation, WindingMatrix, try_permutations},
+    meta_knot_finder::KnotFinder,
+    reidemiester::{knot_commute, knot_switch},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchRecord {
@@ -27,12 +36,11 @@ pub struct KnotResult {
     pub search_record: Result<SearchRecord, SearchFailure>,
 }
 
-
 /// Helper function: gridstate_finder_commute that respects a global visited set.
 pub fn manual_gridstate_finder(
     vertlists: HashSet<DirList>,
     logging: &LoggingType,
-    mut knot_finder: KnotFinder
+    mut knot_finder: KnotFinder,
 ) -> Result<SearchRecord, SearchFailure> {
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::SingleLine);
@@ -94,7 +102,11 @@ pub fn legacy_gridstate_finder_commute_with_visited(
 
         current_states = current_states
             .par_iter()
-            .flat_map(|r| knot_commute(&r))
+            .flat_map(|r| {
+                let mut a = knot_commute(&r);
+                a.extend(knot_switch(&r));
+                a
+            })
             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
             .collect::<HashSet<_>>();
 
@@ -123,13 +135,13 @@ pub fn legacy_gridstate_finder_commute_with_visited(
 //         .into_iter()
 //         .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
 //         .collect();
-// 
+//
 //     let mut result = manaual_gridstate_finder(gridstates_after_stab, n, logging, knot_commute);
-// 
+//
 //     if let Ok(ref mut record) = result {
 //         record.stabilizations = 1;
 //     }
-// 
+//
 //     result
 // }
 

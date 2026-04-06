@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, meta_knot_finder::{read_to_knot_finder, KnotFinder}, reidemiester::{knot_commute, knot_stab}, search::{manual_gridstate_finder, KnotResult, SearchFailure}
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, meta_knot_finder::{read_to_knot_finder, KnotFinder}, reidemiester::{knot_commute, knot_stab}, search::{legacy_gridstate_finder_commute_with_visited, manual_gridstate_finder, KnotResult, SearchFailure}
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -28,7 +28,6 @@ struct Args {
     #[arg(short, long)]
     output: Option<String>,
 
-    /// TODO: unimplemented
     /// Only used optionally in combination with the  `--knots rest`. If this value is undefined,
     /// `--knots rest` will refer to the output file if it already exists, mutating it in the
     /// process.
@@ -156,6 +155,7 @@ fn main() {
             }
         }
 
+        // legacy_gridstate_finder_commute_with_visited(HashSet::from([vertlist]), args.depth, &logging_type);
         let mut search_record = manual_gridstate_finder(HashSet::from([vertlist]), &logging_type, knot_finder.clone());
         if matches!(logging_type, LoggingType::SingleLine) {
             println!("");
@@ -282,10 +282,10 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
     )
     .unwrap();
 
-    let mut positives: Vec<KnotResult> =
+    let mut exhausted_error: Vec<String> =
         serde_json::from_value(a.get("search_space_exahusted_error").unwrap().clone()).unwrap();
-    let depth_error: Vec<KnotResult> =
+    let depth_error: Vec<String> =
         serde_json::from_value(a.get("depth_error").unwrap().clone()).unwrap();
-    positives.extend(depth_error);
-    positives.into_iter().map(|a| a.knot).collect()
+    exhausted_error.extend(depth_error);
+    exhausted_error
 }

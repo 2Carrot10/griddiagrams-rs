@@ -2,7 +2,7 @@ use std::{iter::Peekable, rc::Rc};
 
 use crate::{
     knot_core::DirList,
-    reidemiester::{knot_commute, knot_stab, knot_switch},
+    reidemiester::{knot_commute, knot_epsilon, knot_stab, knot_switch},
 };
 use regex::Regex;
 #[derive(Clone, Debug)]
@@ -160,20 +160,21 @@ fn parse_union(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Sear
             None => break,
             Some(other) => match other.as_ref() {
                 "stab" | "stabilize" | "st" => {
-                    tokens.next();
                     knot_stab
                 }
                 "commute" | "c" => {
-                    tokens.next();
                     knot_commute
                 }
                 "switch" | "sw" => {
-                    tokens.next();
                     knot_switch
+                },
+                "epsilon" | "e" => {
+                    knot_epsilon
                 },
                 _ => break,
             },
         };
+        tokens.next();
         ls.push(function);
     }
 

@@ -127,7 +127,15 @@ pub fn knot_switch(vertlist: &DirList) -> Vec<DirList> {
         h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
 
     h_to_v_commutations.extend(v_commutations);
+
+    if h_to_v_commutations.len() != 0 {
+        println!("FOUND SWITCH! Num of switches {}", h_to_v_commutations.len());
+    }
     h_to_v_commutations
+}
+
+pub fn knot_epsilon(vertlist: &DirList) -> Vec<DirList> {
+    vec![vertlist.clone()]
 }
 
 pub fn knot_commute(vertlist: &DirList) -> Vec<DirList> {
