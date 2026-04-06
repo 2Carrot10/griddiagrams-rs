@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, meta_knot_finder::{read_to_knot_finder, KnotFinder}, reidemiester::{knot_commute, knot_stab}, search::{manaual_gridstate_finder, KnotResult, SearchFailure}
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, meta_knot_finder::{read_to_knot_finder, KnotFinder}, reidemiester::{knot_commute, knot_stab}, search::{manual_gridstate_finder, KnotResult, SearchFailure}
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -156,7 +156,7 @@ fn main() {
             }
         }
 
-        let mut search_record = manaual_gridstate_finder(HashSet::from([vertlist]), &logging_type, knot_finder.clone());
+        let mut search_record = manual_gridstate_finder(HashSet::from([vertlist]), &logging_type, knot_finder.clone());
         if matches!(logging_type, LoggingType::SingleLine) {
             println!("");
         }

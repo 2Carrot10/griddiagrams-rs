@@ -29,7 +29,7 @@ pub struct KnotResult {
 
 
 /// Helper function: gridstate_finder_commute that respects a global visited set.
-pub fn manaual_gridstate_finder(
+pub fn manual_gridstate_finder(
     vertlists: HashSet<DirList>,
     logging: &LoggingType,
     mut knot_finder: KnotFinder
@@ -65,6 +65,44 @@ pub fn manaual_gridstate_finder(
 
         previous_states.extend(current_states.clone());
         i += 1;
+    }
+
+    Err(SearchFailure::HitDepthLimit)
+}
+pub fn legacy_gridstate_finder_commute_with_visited(
+    vertlists: HashSet<DirList>,
+    n: i32,
+    logging: &LoggingType,
+) -> Result<SearchRecord, SearchFailure> {
+    let do_logging = !matches!(logging, LoggingType::None);
+    let single_line = matches!(logging, LoggingType::SingleLine);
+
+    let mut current_states = vertlists;
+    let mut previous_states = HashSet::new(); // Only keeps the last iteration
+    for i in 0..n {
+        if let Some(record) = current_states
+            .par_iter()
+            .filter_map(try_permutations)
+            .find_any(|_| true)
+        {
+            return Ok(record);
+        }
+
+        if do_logging {
+            gridstate_log(&current_states, i, previous_states.len(), single_line);
+        }
+
+        current_states = current_states
+            .par_iter()
+            .flat_map(|r| knot_commute(&r))
+            .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
+            .collect::<HashSet<_>>();
+
+        if current_states.is_empty() {
+            return Err(SearchFailure::ExaustedSearchSpace);
+        }
+
+        previous_states.extend(current_states.clone());
     }
 
     Err(SearchFailure::HitDepthLimit)
