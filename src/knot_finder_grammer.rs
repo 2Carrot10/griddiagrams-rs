@@ -48,19 +48,30 @@ impl AlgorithmGrammer for ListSearchType {
 #[derive(Clone, Debug)]
 pub struct UnionSearchType {
     pub contains: Vec<(MoveFunction, String)>,
+    current: bool,
 }
 
 impl AlgorithmGrammer for UnionSearchType {
     fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+        if !self.current {
+            self.current = !self.current;
+            return None;
+        }
+
         if self.contains.is_empty() {
             return None;
         }
         let mut name: String = "".to_string();
         for (_, new_name) in &self.contains {
-            name = format!("{} | {}", name, new_name);
+            if &name != "" {
+                name = format!("{} | {}", name, new_name);
+            } else {
+                name = new_name.clone();
+            }
         }
 
         let contains = self.contains.clone();
+        self.current = !self.current;
 
         Some((
             Box::new(move |input: &DirList| {
@@ -92,6 +103,7 @@ impl AlgorithmGrammer for RepeatSearchType {
                 self.next()
             }
         } else {
+            self.curr = 0;
             None
         }
     }
@@ -211,7 +223,9 @@ pub fn read_to_knot_finder(filename: String) -> KnotFinder {
     let mut tokens = re
         .find_iter(text)
         .map(|capture| capture.as_str().to_string())
-        .collect::<Vec<_>>().into_iter().peekable();
+        .collect::<Vec<_>>()
+        .into_iter()
+        .peekable();
     let a = KnotFinder(parse_expr(&mut tokens).unwrap());
 
     assert_eq!(tokens.peek(), None, "Parser failed");
@@ -245,22 +259,36 @@ fn parse_union(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Sear
         ls.push(function);
     }
 
-    Some(SearchType::Union(UnionSearchType { contains: ls }))
+    Some(SearchType::Union(UnionSearchType {
+        contains: ls,
+        current: true,
+    }))
 }
 
-fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
+fn parse_parens(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
+    if consume_if_equals(tokens, "[") {
+        println!("START");
+        let result = parse_expr(tokens);
+        println!("END");
+        assert_eq!(tokens.next(), Some("]".to_string()));
+        return result;
+    }
+
     if consume_if_equals(tokens, "(") {
         let result = parse_expr(tokens);
         assert_eq!(tokens.next(), Some(")".to_string()));
         return result;
     }
 
-    if consume_if_equals(tokens, "[") {
+    if consume_if_equals(tokens, "{") {
         let result = parse_union(tokens);
-        assert_eq!(tokens.next(), Some("]".to_string()));
+        assert_eq!(tokens.next(), Some("}".to_string()));
         return result;
     }
+    panic!("Expected '{{' or '['. (this is likely an issue with the Rust code)");
+}
 
+fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
     if let Ok(count) = tokens.peek().unwrap().parse::<i32>() {
         tokens.next();
         return Some(SearchType::Repeat(RepeatSearchType {
@@ -282,17 +310,30 @@ fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Searc
                 }
                 "commute" | "c" => {
                     tokens.next();
-                    SearchType::Function(FunctionSearchType::new(knot_commute, String::from("commute")))
+                    SearchType::Function(FunctionSearchType::new(
+                        knot_commute,
+                        String::from("commute"),
+                    ))
                 }
                 "switch" | "sw" => {
                     tokens.next();
-                    SearchType::Function(FunctionSearchType::new(knot_switch, String::from("switch")))
+                    SearchType::Function(FunctionSearchType::new(
+                        knot_switch,
+                        String::from("switch"),
+                    ))
                 }
                 "destab" | "d" => {
                     tokens.next();
-                    SearchType::Function(FunctionSearchType::new(knot_destab, String::from("destab")))
+                    SearchType::Function(FunctionSearchType::new(
+                        knot_destab,
+                        String::from("destab"),
+                    ))
                 }
-                "(" | "[" => parse_expr(tokens).unwrap(),
+                "{" | "[" | "(" => {
+                    let a = parse_parens(tokens).unwrap();
+                    println!("right after");
+                    a
+                }
                 _ => break,
             },
         };

@@ -1,1 +1,4 @@
-100 [ commute switch ]
+10 (
+	( 5 commute )
+	{ commute switch }
+)

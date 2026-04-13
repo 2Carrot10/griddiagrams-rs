@@ -1,1 +1,4 @@
-100 [ commute stab ]
+10 (
+	{ commute stab }
+	( 9 commute )
+)
