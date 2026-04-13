@@ -1,19 +1,30 @@
 #![feature(if_let_guard)]
 mod data;
-mod plotting;
+mod knot_core;
+mod knot_finder_grammer;
+mod reidemiester;
 mod search;
-mod search_core;
 mod tests;
-use std::fs;
+
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+};
 
 use clap::Parser;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    search_core::{
-        gridstate_finder_commute, gridstate_finder_stab, KnotResult, SearchFailure
+    knot_core::{DirList, is_valid},
+    knot_finder_grammer::{
+        KnotFinder, ListSearchType, RepeatSearchType, SearchType, commute_search,
+        read_to_knot_finder, stab_search,
     },
+    reidemiester::{knot_commute, knot_stab},
+    search::{KnotResult, SearchFailure, manual_gridstate_finder},
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -21,16 +32,27 @@ const UNSOLVED_KNOT_NAMES: [&str; 12] = [
     "13n_2915", "13n_3089", "13n_3904", "13n_3932",
 ];
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(version, about, long_about = None)]
 struct Args {
-    ///
     #[arg(short, long)]
-    output_dir: Option<String>,
+    output: Option<String>,
 
-    /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas, a
-    /// range "<start> - <end>", a percentage of the dataset to use "<percent>%".
-    /// (i.e. 12n_79, 12n_168, 13n_282, 13n_917)
+    /// Only used optionally in combination with the  `--knots rest`. If this value is undefined,
+    /// `--knots rest` will refer to the output file if it already exists, mutating it in the
+    /// process.
+    #[arg(short, long)]
+    input: Option<String>,
+
+    /// TODO: unimplemented
+    /// The file to use in place of command flags. Used to avoid repeatedly writing out long commands.
+    #[arg(short, long)]
+    config: Option<String>,
+
+    /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas
+    /// (e.g. 12n_79, 12n_168, 13n_282, 13n_917), a range "<start> - <end>", a percentage of
+    /// the dataset to use "<percent>%", "rest" representing the knots of the output which have
+    /// not yet been solved, or a vertlist in the format [(1,0), (0,1)].
     #[arg(short, long, default_value_t = String::from("unsolved"))]
     knots: String,
 
@@ -42,7 +64,7 @@ struct Args {
     #[arg(long, default_value_t = String::from("single"))]
     logging: String,
 
-    /// Options: positives, negative, both
+    /// Options: positives, negative, both, neither
     #[arg(long, default_value_t = String::from("both"))]
     result_type: String,
 
@@ -83,13 +105,27 @@ fn main() {
         "neither" => (false, false),
         _ => panic!("Could not read result type"),
     };
-    let knot_names = match args.knots.as_str() {
+
+    let knot_list: Vec<_> = match args.knots.as_str() {
         "unsolved" => UNSOLVED_KNOT_NAMES
             .to_vec()
             .into_iter()
-            .map(|a| a.to_string())
+            .map(|a| (get_vlist_by_name(&a.to_string(), &csv), a.to_string()))
             .collect(),
-        "all" => get_all_knot_names(&csv),
+        "all" => get_all_knot_names(&csv)
+            .into_iter()
+            .map(|name| (get_vlist_by_name(&name, &csv), name))
+            .collect(),
+        "rest" => get_rest_from_results(if let Some(input) = args.input {
+            input
+        } else if let Some(output) = &args.output {
+            output.clone()
+        } else {
+            panic!("Rest requires an input or output file")
+        })
+        .into_iter()
+        .map(|name| (get_vlist_by_name(&name, &csv), name))
+        .collect(),
         string
             if let Some(parsed_num) = string
                 .strip_suffix("%")
@@ -97,16 +133,34 @@ fn main() {
                 .flatten() =>
         {
             let knots = get_all_knot_names(&csv);
-            knots[..(knots.len() * (parsed_num / 100) as usize)].to_vec()
+            knots[..(knots.len() * (parsed_num / 100) as usize)]
+                .to_vec()
+                .into_iter()
+                .map(|name| (get_vlist_by_name(&name, &csv), name))
+                .collect()
         }
         string
             if let Some((Some(start), Some(end))) = string
                 .split_once("-")
                 .map(|(a, b)| (a.trim().parse::<i32>().ok(), b.trim().parse::<i32>().ok())) =>
         {
-            get_all_knot_names(&csv)[start as usize..end as usize].to_vec()
+            get_all_knot_names(&csv)[start as usize..end as usize]
+                .to_vec()
+                .into_iter()
+                .map(|name| (get_vlist_by_name(&name, &csv), name))
+                .collect()
         }
-        names => names.split(",").map(|a| a.trim().to_string()).collect(),
+        string if string.chars().next() == Some('[') => {
+            vec![(
+                string_to_vertmap(string.to_string()),
+                String::from("Custom knot"),
+            )]
+        }
+        names => names
+            .split(",")
+            .map(|a| a.trim().to_string())
+            .map(|name| (get_vlist_by_name(&name, &csv), name))
+            .collect(),
     };
 
     // Set rayon thread count global
@@ -119,15 +173,14 @@ fn main() {
 
     let mut results = vec![];
 
-    let search_function = match args.algorithm.as_str() {
-        "stab" => gridstate_finder_stab,
-        "commute" => gridstate_finder_commute,
-        _ => panic!("Could not read algorithm type"),
+    let knot_finder = match args.algorithm.as_str() {
+        "stab" | "stabilize" => stab_search(args.depth),
+        "commute" => commute_search(args.depth),
+        filename => read_to_knot_finder(filename.to_string()),
     };
 
-    let total_length = knot_names.len();
-    for (i, knot) in knot_names.into_iter().enumerate() {
-        let vertlist = get_vlist_by_name(knot.to_string(), &csv);
+    let total_length = knot_list.len();
+    for (i, (vertlist, knot)) in knot_list.into_iter().enumerate() {
         if !matches!(logging_type, LoggingType::None) {
             println!("----");
             println!("# {}: {}", i, knot);
@@ -136,9 +189,13 @@ fn main() {
             }
         }
 
-        let mut search_record = search_function(vertlist, args.depth, &logging_type);
+        let mut search_record = manual_gridstate_finder(
+            HashSet::from([vertlist]),
+            &logging_type,
+            knot_finder.clone(),
+        );
         if matches!(logging_type, LoggingType::SingleLine) {
-            println!("");
+            println!();
         }
 
         match &mut search_record {
@@ -149,12 +206,18 @@ fn main() {
             }
             Err(SearchFailure::HitDepthLimit) => {
                 if log_negatives {
-                    println!("Could not find nice knot for {}, #{} (depth limit error)", knot, i);
+                    println!(
+                        "Could not find nice knot for {}, #{} (depth limit error)",
+                        knot, i
+                    );
                 }
             }
-            Err(SearchFailure::ExaustedSearchSpace) => {
+            Err(SearchFailure::ExhaustedSearchSpace) => {
                 if log_negatives {
-                    println!("Could not find nice knot for {}, #{} (search space error)", knot, i);
+                    println!(
+                        "Could not find nice knot for {}, #{} (search space error)",
+                        knot, i
+                    );
                 }
             }
         }
@@ -167,7 +230,7 @@ fn main() {
     if !args.hide_analytics && total_length != 1 {
         compute_analytics(&results);
     }
-    if let Some(output_dir) = args.output_dir {
+    if let Some(output_dir) = args.output {
         save_results(output_dir, &results);
     }
 }
@@ -185,7 +248,7 @@ fn compute_analytics(results: &Vec<KnotResult>) {
                 knot: _,
             } => (1, 0, 0),
             KnotResult {
-                search_record: Err(SearchFailure::ExaustedSearchSpace),
+                search_record: Err(SearchFailure::ExhaustedSearchSpace),
                 knot: _,
             } => (0, 1, 0),
             KnotResult {
@@ -219,33 +282,86 @@ fn compute_analytics(results: &Vec<KnotResult>) {
 }
 
 fn save_results(file_name: String, results: &Vec<KnotResult>) {
-    let mut ok_vec = vec![];
-    let mut depth_err_vec = vec![];
-    let mut space_err_vec = vec![];
+    let mut map: HashMap<String, String> = HashMap::new();
     for result in results {
-        match result {
-            KnotResult {
-                search_record: Ok(_),
-                knot: _,
-            } => ok_vec.push(result),
-            KnotResult {
-                search_record: Err(SearchFailure::HitDepthLimit),
-                knot,
-            } => depth_err_vec.push(knot),
-            KnotResult {
-                search_record: Err(SearchFailure::ExaustedSearchSpace),
-                knot,
-            } => space_err_vec.push(knot),
-        }
-    };
-    let command = std::env::args().collect::<Vec<String>>().join(" ");
-    let map = json!({
-        "positives": ok_vec,
-        "positives": ok_vec,
-        "depth_error": depth_err_vec,
-        "search_space_exahusted_error": space_err_vec ,
-        "command": command
-    });
+        map.insert(
+            result.knot.clone(),
+            match result {
+                KnotResult {
+                    search_record: Ok(_),
+                    knot: _,
+                } => "found diagram",
+                KnotResult {
+                    search_record: Err(SearchFailure::HitDepthLimit),
+                    knot: _,
+                } => "depth error",
+                KnotResult {
+                    search_record: Err(SearchFailure::ExhaustedSearchSpace),
+                    knot: _,
+                } => "space exhausted error",
+            }
+            .to_string(),
+        );
+    }
 
     let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
+}
+
+fn get_rest_from_results(file_name: String) -> Vec<String> {
+    let json_string = serde_json::from_str::<serde_json::Map<_, _>>(
+        str::from_utf8(&fs::read(file_name).unwrap()).unwrap(),
+    )
+    .unwrap();
+
+    let keys: Vec<String> = json_string
+        .keys()
+        .filter_map(|key| match json_string.get(key).and_then(|v| v.as_str()) {
+            Some("space exhausted error") | Some("depth error") => Some(key.clone()),
+            Some(x) => {
+                None
+            }
+            None => None,
+        })
+        .collect();
+
+    return keys;
+}
+
+fn string_to_vertmap(text: String) -> DirList {
+    let mut out: DirList = DirList(vec![]);
+
+    let re = Regex::new(
+        r#"(?x)
+        \d+                             |
+        [[[:alpha:]]\_]+                |
+        '.+?'                           |
+        ".*"+?                          |
+        [=+*/%&|<>!?^~\#\-]+   |
+        [\(\)\[\]\{\}.\:;,@]|
+        \p{Letter}
+        "#,
+    )
+    .unwrap();
+
+    let mut tokens = re
+        .find_iter(&text)
+        .map(|capture| capture.as_str().to_string())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .peekable();
+
+    assert_eq!(tokens.next().as_deref(), Some("["));
+    while tokens.peek().map(|s| s.as_str()) != Some("]") {
+        assert_eq!(tokens.next().as_deref(), Some("("));
+        let x = tokens.next().unwrap().parse::<i32>().unwrap();
+        assert_eq!(tokens.next().as_deref(), Some(","));
+        let o = tokens.next().unwrap().parse::<i32>().unwrap();
+        assert_eq!(tokens.next().as_deref(), Some(")"));
+        if tokens.peek().map(|s| s.as_str()) != Some("]") {
+            assert_eq!(tokens.next().as_deref(), Some(","));
+        }
+        out.0.push((x, o));
+    }
+    assert!(is_valid(&out), "Diagram is not a valid knot");
+    out
 }
