@@ -52,7 +52,7 @@ struct Args {
     /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas
     /// (e.g. 12n_79, 12n_168, 13n_282, 13n_917), a range "<start> - <end>", a percentage of
     /// the dataset to use "<percent>%", "rest" representing the knots of the output which have
-    /// not yet been solved.
+    /// not yet been solved, or a vertlist in the format [(1,0), (0,1)].
     #[arg(short, long, default_value_t = String::from("unsolved"))]
     knots: String,
 
@@ -315,12 +315,13 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
 
     let keys: Vec<String> = json_string
         .keys()
-        .filter_map(
-            |key| match json_string.get(key).unwrap().to_string().as_ref() {
-                "space exhausted error" | "depth error" => Some(key.clone()),
-                _ => None,
-            },
-        )
+        .filter_map(|key| match json_string.get(key).and_then(|v| v.as_str()) {
+            Some("space exhausted error") | Some("depth error") => Some(key.clone()),
+            Some(x) => {
+                None
+            }
+            None => None,
+        })
         .collect();
 
     return keys;

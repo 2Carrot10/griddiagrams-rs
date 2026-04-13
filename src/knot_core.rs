@@ -125,7 +125,7 @@ pub fn hlist(gridlist: GridList) -> DirList {
 
     for i in (3..extended_grid.len() - 2).step_by(2) {
         x = x + (extended_grid[i + 1] as usize - extended_grid[i - 1] as usize);
-        if 0 <= x && x < hsegments.len() {
+        if x < hsegments.len() {
             hsegments[x] = Some((extended_grid[i], extended_grid[i + 2]));
         } else {
             panic!("Calculated index is out of bounds!");

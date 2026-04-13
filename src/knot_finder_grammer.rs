@@ -267,9 +267,7 @@ fn parse_union(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Sear
 
 fn parse_parens(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
     if consume_if_equals(tokens, "[") {
-        println!("START");
         let result = parse_expr(tokens);
-        println!("END");
         assert_eq!(tokens.next(), Some("]".to_string()));
         return result;
     }

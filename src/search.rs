@@ -44,7 +44,7 @@ pub fn manual_gridstate_finder(
 
     let mut current_states = vertlists;
     let mut previous_frontier_size = 0;
-    let mut global_states = HashSet::new(); // Only keeps the last iteration
+    let mut global_states = current_states.clone();
     let mut i = 0;
 
     while let Some((knot_finding_function, move_name)) = knot_finder.next() {
