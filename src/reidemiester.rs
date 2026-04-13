@@ -147,7 +147,7 @@ pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
 
 pub fn knot_destab(vertlist: &DirList) -> Vec<DirList> {
     let v_commutations = destab_move(vertlist);
-    let h_commutations = destab_move(&v_to_h(vertlist)); // Bad clone
+    let h_commutations = destab_move(&v_to_h(vertlist));
     let mut h_to_v_commutations: Vec<DirList> =
         h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
 
@@ -187,7 +187,7 @@ fn destab_move(vertlist: &DirList) -> Vec<DirList> {
 }
 
 fn can_destab((x, o): (i32, i32)) -> bool {
-    x == o
+    (x - o).abs() == 1
 }
 
 pub fn stabilize(

@@ -198,9 +198,13 @@ fn main() {
         }
 
         match &mut search_record {
-            Ok(_) => {
+            Ok(ok) => {
                 if log_positives {
                     println!("Found nice knot for: {}, #{}", knot, i);
+
+                    if !args.hide_diagrams {
+                        println!("{}", ok.vlist);
+                    }
                 }
             }
             Err(SearchFailure::HitDepthLimit) => {
