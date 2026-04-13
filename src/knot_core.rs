@@ -156,6 +156,7 @@ pub fn vlist(gridlist: GridList) -> DirList {
     let mut x = n as i32 + 1;
     let mut vsegments = vec![None; 2 * n + 1];
     vsegments[x as usize] = Some((extended_grid[0], extended_grid[2]));
+    let a = vsegments[1];
 
     for i in (2..extended_grid.len() - 2).step_by(2) {
         x = x + (extended_grid[i + 1] - extended_grid[i - 1]);

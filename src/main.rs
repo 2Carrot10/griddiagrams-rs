@@ -1,20 +1,30 @@
 #![feature(if_let_guard)]
 mod data;
 mod knot_core;
+mod knot_finder_grammer;
 mod plotting;
 mod reidemiester;
 mod search;
 mod tests;
-mod meta_knot_finder;
 
-use std::{collections::HashSet, fs};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+};
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, meta_knot_finder::{read_to_knot_finder, KnotFinder}, reidemiester::{knot_commute, knot_stab}, search::{legacy_gridstate_finder_commute_with_visited, manual_gridstate_finder, KnotResult, SearchFailure}
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
+    knot_finder_grammer::{
+        commute_search, read_to_knot_finder, stab_search, KnotFinder, ListSearchType, RepeatSearchType, SearchType
+    },
+    reidemiester::{knot_commute, knot_stab},
+    search::{
+        legacy_gridstate_finder_commute_with_visited, manual_gridstate_finder, KnotResult, SearchFailure
+    },
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -54,7 +64,7 @@ struct Args {
     #[arg(long, default_value_t = String::from("single"))]
     logging: String,
 
-    /// Options: positives, negative, both
+    /// Options: positives, negative, both, neither
     #[arg(long, default_value_t = String::from("both"))]
     result_type: String,
 
@@ -139,10 +149,12 @@ fn main() {
     let mut results = vec![];
 
     let knot_finder = match args.algorithm.as_str() {
-        "stab" => KnotFinder::build(args.depth, knot_stab),
-        "commute" => KnotFinder::build(args.depth, knot_commute),
+        "stab" | "stabilize" => stab_search(args.depth),
+        "commute" => commute_search(args.depth),
         filename => read_to_knot_finder(filename.to_string()),
     };
+
+    println!("Knot finder {:?}", knot_finder);
 
     let total_length = knot_names.len();
     for (i, knot) in knot_names.into_iter().enumerate() {
@@ -156,9 +168,13 @@ fn main() {
         }
 
         // legacy_gridstate_finder_commute_with_visited(HashSet::from([vertlist]), args.depth, &logging_type);
-        let mut search_record = manual_gridstate_finder(HashSet::from([vertlist]), &logging_type, knot_finder.clone());
+        let mut search_record = manual_gridstate_finder(
+            HashSet::from([vertlist]),
+            &logging_type,
+            knot_finder.clone(),
+        );
         if matches!(logging_type, LoggingType::SingleLine) {
-            println!("");
+            println!();
         }
 
         match &mut search_record {
@@ -175,7 +191,7 @@ fn main() {
                     );
                 }
             }
-            Err(SearchFailure::ExaustedSearchSpace) => {
+            Err(SearchFailure::ExhaustedSearchSpace) => {
                 if log_negatives {
                     println!(
                         "Could not find nice knot for {}, #{} (search space error)",
@@ -211,7 +227,7 @@ fn compute_analytics(results: &Vec<KnotResult>) {
                 knot: _,
             } => (1, 0, 0),
             KnotResult {
-                search_record: Err(SearchFailure::ExaustedSearchSpace),
+                search_record: Err(SearchFailure::ExhaustedSearchSpace),
                 knot: _,
             } => (0, 1, 0),
             KnotResult {
@@ -245,47 +261,44 @@ fn compute_analytics(results: &Vec<KnotResult>) {
 }
 
 fn save_results(file_name: String, results: &Vec<KnotResult>) {
-    let mut ok_vec = vec![];
-    let mut depth_err_vec = vec![];
-    let mut space_err_vec = vec![];
+    let mut map: HashMap<String, String> = HashMap::new();
     for result in results {
-        match result {
-            KnotResult {
-                search_record: Ok(_),
-                knot: _,
-            } => ok_vec.push(result),
-            KnotResult {
-                search_record: Err(SearchFailure::HitDepthLimit),
-                knot,
-            } => depth_err_vec.push(knot),
-            KnotResult {
-                search_record: Err(SearchFailure::ExaustedSearchSpace),
-                knot,
-            } => space_err_vec.push(knot),
-        }
+        map.insert(
+            result.knot.clone(),
+            match result {
+                KnotResult {
+                    search_record: Ok(_),
+                    knot: _,
+                } => "found diagram",
+                KnotResult {
+                    search_record: Err(SearchFailure::HitDepthLimit),
+                    knot: _,
+                } => "depth error",
+                KnotResult {
+                    search_record: Err(SearchFailure::ExhaustedSearchSpace),
+                    knot: _,
+                } => "space exhausted error",
+            }
+            .to_string(),
+        );
     }
-    let command = std::env::args().collect::<Vec<String>>().join(" ");
-    let map = json!({
-        "positives": ok_vec,
-        "positives": ok_vec,
-        "depth_error": depth_err_vec,
-        "search_space_exahusted_error": space_err_vec ,
-        "command": command
-    });
 
     let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
 }
 
 fn get_rest_from_results(file_name: String) -> Vec<String> {
-    let a = serde_json::from_str::<serde_json::Map<_, _>>(
+    let json_string = serde_json::from_str::<serde_json::Map<_, _>>(
         str::from_utf8(&fs::read(file_name).unwrap()).unwrap(),
     )
     .unwrap();
 
-    let mut exhausted_error: Vec<String> =
-        serde_json::from_value(a.get("search_space_exahusted_error").unwrap().clone()).unwrap();
-    let depth_error: Vec<String> =
-        serde_json::from_value(a.get("depth_error").unwrap().clone()).unwrap();
-    exhausted_error.extend(depth_error);
-    exhausted_error
+    let keys: Vec<String> = json_string
+        .keys()
+        .filter_map(|key| match json_string.get(key).unwrap().to_string().as_ref() {
+            "space exhausted error" | "depth error" => Some(key.clone()),
+            _ => None
+        })
+        .collect();
+
+    return keys
 }

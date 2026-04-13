@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     LoggingType,
     knot_core::{DirList, Permutation, WindingMatrix, try_permutations},
-    meta_knot_finder::KnotFinder,
+    knot_finder_grammer::KnotFinder,
     reidemiester::{knot_commute, knot_switch},
 };
 
@@ -27,7 +27,7 @@ pub struct SearchRecord {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SearchFailure {
     HitDepthLimit,
-    ExaustedSearchSpace,
+    ExhaustedSearchSpace,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,9 +46,17 @@ pub fn manual_gridstate_finder(
     let single_line = matches!(logging, LoggingType::SingleLine);
 
     let mut current_states = vertlists;
-    let mut previous_states = HashSet::new(); // Only keeps the last iteration
+    // let mut previous_states = HashSet::new(); // Only keeps the last iteration
     let mut i = 0;
-    while let Some(knot_finding_function) = knot_finder.next() {
+    // println!("New knots");
+    while let Some((knot_finding_function, name)) = knot_finder.next() {
+        println!("{}", name);
+        // println!("Current states");
+        // for s in &current_states {
+        //     println!("{:?}",s);
+        //     println!("{}",s);
+        // }
+
         if let Some(record) = current_states
             .par_iter()
             .filter_map(try_permutations)
@@ -57,26 +65,27 @@ pub fn manual_gridstate_finder(
             return Ok(record);
         }
 
-        if do_logging {
-            gridstate_log(&current_states, i, previous_states.len(), single_line);
-        }
+        // if do_logging {
+        //     gridstate_log(&current_states, i, previous_states.len(), single_line);
+        // }
 
-        current_states = current_states
-            .par_iter()
-            .flat_map(|r| knot_finding_function(&r))
-            .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
-            .collect::<HashSet<_>>();
+        current_states = current_states;
+        //     .par_iter()
+        //     .flat_map(|r| knot_finding_function(&r))
+        //     .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
+        //     .collect::<HashSet<_>>();
 
         if current_states.is_empty() {
-            return Err(SearchFailure::ExaustedSearchSpace);
+            return Err(SearchFailure::ExhaustedSearchSpace);
         }
 
-        previous_states.extend(current_states.clone());
+        // previous_states.extend(current_states.clone());
         i += 1;
     }
 
     Err(SearchFailure::HitDepthLimit)
 }
+
 pub fn legacy_gridstate_finder_commute_with_visited(
     vertlists: HashSet<DirList>,
     n: i32,
@@ -111,7 +120,7 @@ pub fn legacy_gridstate_finder_commute_with_visited(
             .collect::<HashSet<_>>();
 
         if current_states.is_empty() {
-            return Err(SearchFailure::ExaustedSearchSpace);
+            return Err(SearchFailure::ExhaustedSearchSpace);
         }
 
         previous_states.extend(current_states.clone());

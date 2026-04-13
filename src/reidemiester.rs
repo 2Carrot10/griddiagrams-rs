@@ -40,15 +40,17 @@ impl StabDir {
         }
     }
 }
-
-pub fn c_move(input_list: &DirList) -> Vec<DirList> {
+pub fn adj_elementwise_move_on_predicate(
+    input_list: &DirList,
+    preciate: impl Fn((i32, i32), (i32, i32)) -> bool,
+) -> Vec<DirList> {
     let mut result = vec![];
     let mut seen = vec![];
 
     let n = input_list.0.len();
 
     for i in 0..(n - 1) {
-        if can_commute(input_list.0[i], input_list.0[i + 1]) {
+        if preciate(input_list.0[i], input_list.0[i + 1]) {
             let mut swapped_list = input_list.clone();
             let a = swapped_list.0[i + 1];
             let b = swapped_list.0[i];
@@ -62,9 +64,9 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
         }
     }
 
-    // Try wrap-around commutation
+    // Try wrap-around comparison
     let index = input_list.0.len() - 1;
-    if can_commute(input_list.0[0], input_list.0[index]) {
+    if preciate(input_list.0[0], input_list.0[index]) {
         let mut swapped_list = input_list.clone();
 
         let a = swapped_list.0[index];
@@ -80,72 +82,40 @@ pub fn c_move(input_list: &DirList) -> Vec<DirList> {
     result
 }
 
+pub fn c_move(input_list: &DirList) -> Vec<DirList> {
+    adj_elementwise_move_on_predicate(input_list, can_commute)
+}
+
 pub fn switch_move(input_list: &DirList) -> Vec<DirList> {
-    let mut result = vec![];
-    let mut seen = vec![];
+    adj_elementwise_move_on_predicate(input_list, can_switch)
+}
 
-    let n = input_list.0.len();
+pub fn knot_column_and_row_predicate_move(
+    vertlist: &DirList,
+    predicate: impl Fn((i32, i32), (i32, i32)) -> bool + 'static,
+) -> Vec<DirList> {
+    let v_list = adj_elementwise_move_on_predicate(vertlist, &predicate);
+    let h_list = adj_elementwise_move_on_predicate(&v_to_h(vertlist), &predicate); // Bad clone
+    let mut h_to_v_commutations: Vec<DirList> =
+        h_list.into_iter().map(|a| h_to_v(&a)).collect();
 
-    for i in 0..(n - 1) {
-        if can_switch(input_list.0[i], input_list.0[i + 1]) {
-            let mut swapped_list = input_list.clone();
-            let a = swapped_list.0[i + 1];
-            let b = swapped_list.0[i];
-            swapped_list.0[i] = a;
-            swapped_list.0[i + 1] = b;
+    h_to_v_commutations.extend(v_list);
 
-            if !seen.contains(&swapped_list.0) {
-                seen.push(swapped_list.0.clone());
-                result.push(swapped_list.clone());
-            }
-        }
-    }
-
-    // Try wrap-around switch
-    let index = input_list.0.len() - 1;
-    if can_switch(input_list.0[0], input_list.0[index]) {
-        let mut swapped_list = input_list.clone();
-
-        let a = swapped_list.0[index];
-        let b = swapped_list.0[0];
-        swapped_list.0[0] = a;
-        swapped_list.0[index] = b;
-
-        if !seen.contains(&swapped_list.0) {
-            seen.push(swapped_list.0.clone());
-            result.push(swapped_list.clone());
-        }
-    }
-    result
+    h_to_v_commutations
 }
 
 // All of these can contain duplicates
 pub fn knot_switch(vertlist: &DirList) -> Vec<DirList> {
-    let v_commutations = switch_move(vertlist);
-    let h_commutations = switch_move(&v_to_h(vertlist)); // Bad clone
-    let mut h_to_v_commutations: Vec<DirList> =
-        h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
-
-    h_to_v_commutations.extend(v_commutations);
-
-    if h_to_v_commutations.len() != 0 {
-        println!("FOUND SWITCH! Num of switches {}", h_to_v_commutations.len());
-    }
-    h_to_v_commutations
-}
-
-pub fn knot_epsilon(vertlist: &DirList) -> Vec<DirList> {
-    vec![vertlist.clone()]
+    knot_column_and_row_predicate_move(vertlist, can_switch)
 }
 
 pub fn knot_commute(vertlist: &DirList) -> Vec<DirList> {
-    let v_commutations = c_move(vertlist);
-    let h_commutations = c_move(&v_to_h(vertlist)); // Bad clone
-    let mut h_to_v_commutations: Vec<DirList> =
-        h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
+    knot_column_and_row_predicate_move(vertlist, can_commute)
+}
 
-    h_to_v_commutations.extend(v_commutations);
-    h_to_v_commutations
+
+pub fn knot_epsilon(vertlist: &DirList) -> Vec<DirList> {
+    vec![vertlist.clone()]
 }
 
 pub fn knot_stab(input_list: &DirList) -> Vec<DirList> {
@@ -160,11 +130,6 @@ pub fn knot_stab(input_list: &DirList) -> Vec<DirList> {
         .into_iter()
         .map(|(segment, dir, index)| stabilize(input_list.clone(), segment, dir, index))
         .collect()
-}
-
-
-pub fn can_commute_or_swap(t1: (i32, i32), t2: (i32, i32)) -> bool {
-    can_commute(t1, t2) || can_switch(t1, t2)
 }
 
 pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
@@ -182,22 +147,56 @@ pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
         || (max2 >= max1 && min2 <= min1)
 }
 
-// Equivalent to is special. t1 and t2 must be next to each other
+// Arguments t1 and t2 must be next to each other
 pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
     let (a, b) = t1;
     let (c, d) = t2;
     (a == d) || (c == b)
 }
 
-// pub fn destab(input_list: &DirList, loc_, direction: Dir) -> Vec<DirList> {
-// }
+pub fn knot_destab(vertlist: &DirList) -> Vec<DirList> {
+    let v_commutations = destab_move(vertlist);
+    let h_commutations = destab_move(&v_to_h(vertlist)); // Bad clone
+    let mut h_to_v_commutations: Vec<DirList> =
+        h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
 
-pub fn destab_move(input_list: &DirList) -> Vec<DirList> {
-    todo!()
+    h_to_v_commutations.extend(v_commutations);
+
+    h_to_v_commutations
 }
 
-fn can_destab(t1: (i32, i32), t2: (i32, i32)) -> bool {
-    todo!()
+fn destab_move(vertlist: &DirList) -> Vec<DirList> {
+    let mut result = vec![];
+
+    let n = vertlist.0.len();
+
+    for i in 0..n {
+        if can_destab(vertlist.0[i]) {
+            let mut swapped_list = vertlist.clone();
+            let (x, o) = swapped_list.0[i];
+            let m = min(x, o);
+            swapped_list.0.remove(i);
+            for j in 0..(n-1) {
+                if swapped_list.0[j].0 > m {
+                    swapped_list.0[j].0 -= 1;
+                }
+
+                if swapped_list.0[j].1 > m {
+                    swapped_list.0[j].1 -= 1;
+                }
+            }
+
+            if !result.contains(&swapped_list) {
+                result.push(swapped_list.clone());
+            }
+        }
+    }
+
+    result
+}
+
+fn can_destab((x, o): (i32, i32)) -> bool {
+    x == o
 }
 
 pub fn stabilize(
