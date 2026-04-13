@@ -175,6 +175,7 @@ impl KnotFinder {
         }))
     }
 
+    #[allow(dead_code)]
     pub fn build(depth: i32, arg: SearchType) -> KnotFinder {
         KnotFinder(SearchType::Repeat(RepeatSearchType {
             contains: Box::new(arg),

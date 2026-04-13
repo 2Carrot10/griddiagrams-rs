@@ -113,6 +113,7 @@ pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
 /// -------
 /// List[Tuple[int, int]]
 ///     List of tuples representing oriented horizontal segments.    
+#[allow(dead_code)]
 pub fn hlist(gridlist: GridList) -> DirList {
     let mut extended_grid = gridlist.clone();
     extended_grid.push(gridlist[0]);
@@ -156,7 +157,6 @@ pub fn vlist(gridlist: GridList) -> DirList {
     let mut x = n as i32 + 1;
     let mut vsegments = vec![None; 2 * n + 1];
     vsegments[x as usize] = Some((extended_grid[0], extended_grid[2]));
-    let a = vsegments[1];
 
     for i in (2..extended_grid.len() - 2).step_by(2) {
         x = x + (extended_grid[i + 1] - extended_grid[i - 1]);
@@ -562,6 +562,7 @@ pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 /// -------
 /// Tuple[List[int], List[int]]
 ///     X and O permutations.
+#[allow(dead_code)]
 pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
     let n = (vertlist.0.len() as i32) - 1;
     let tempx: Vec<i32> = vertlist.0.iter().map(|a| a.0).collect();

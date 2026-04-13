@@ -14,18 +14,17 @@ use std::{
 use clap::Parser;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
     knot_core::{DirList, is_valid},
-    knot_finder_grammer::{
-        KnotFinder, ListSearchType, RepeatSearchType, SearchType, commute_search,
-        read_to_knot_finder, stab_search,
-    },
-    reidemiester::{knot_commute, knot_stab},
     search::{KnotResult, SearchFailure, manual_gridstate_finder},
 };
+
+use crate::knot_finder_grammer::{
+        commute_search,
+        read_to_knot_finder, stab_search,
+    };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
     "12n_79", "12n_168", "13n_282", "13n_917", "13n_1279", "13n_1281", "13n_1413", "13n_1826",
@@ -317,7 +316,7 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
         .keys()
         .filter_map(|key| match json_string.get(key).and_then(|v| v.as_str()) {
             Some("space exhausted error") | Some("depth error") => Some(key.clone()),
-            Some(x) => {
+            Some(_) => {
                 None
             }
             None => None,

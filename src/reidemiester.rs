@@ -1,7 +1,6 @@
 use crate::knot_core::{DirList, h_to_v, v_to_h};
 use std::cmp::max;
 use std::cmp::min;
-use std::collections::HashSet;
 
 pub enum StabDir {
     NorthWest,
@@ -80,14 +79,6 @@ pub fn adj_elementwise_move_on_predicate(
         }
     }
     result
-}
-
-pub fn c_move(input_list: &DirList) -> Vec<DirList> {
-    adj_elementwise_move_on_predicate(input_list, can_commute)
-}
-
-pub fn switch_move(input_list: &DirList) -> Vec<DirList> {
-    adj_elementwise_move_on_predicate(input_list, can_switch)
 }
 
 pub fn knot_column_and_row_predicate_move(

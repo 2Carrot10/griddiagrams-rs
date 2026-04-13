@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    knot_core::{is_valid, try_permutations, DirList, Permutation, WindingMatrix}, knot_finder_grammer::KnotFinder, reidemiester::{knot_commute, knot_switch}, LoggingType
+    knot_core::{try_permutations, DirList, Permutation, WindingMatrix}, knot_finder_grammer::KnotFinder, LoggingType
 };
 
 #[derive(Debug, Serialize, Deserialize)]
