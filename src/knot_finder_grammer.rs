@@ -8,7 +8,7 @@ use crate::{
 use regex::Regex;
 
 type MoveFunction = fn(&DirList) -> Vec<DirList>;
-type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<DirList>>;
+type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<DirList> + Sync>;
 
 trait AlgorithmGrammer {
     fn next(&mut self) -> Option<(DynamicMoveFunction, String)>;
@@ -30,8 +30,8 @@ impl ListSearchType {
 }
 impl AlgorithmGrammer for ListSearchType {
     fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
-        let answer = if self.curr < self.contains.len() {
-            let mut result = self.contains[self.curr].clone();
+        if self.curr < self.contains.len() {
+            let result = &mut self.contains[self.curr];
             if let Some(some) = result.next() {
                 Some(some)
             } else {
@@ -41,13 +41,7 @@ impl AlgorithmGrammer for ListSearchType {
         } else {
             self.curr = 0;
             None
-        };
-        if let Some(a) = &answer {
-            println!("Found {}", a.1);
-        } else {
-            println!("Found None");
         }
-        answer
     }
 }
 
@@ -104,7 +98,7 @@ impl AlgorithmGrammer for RepeatSearchType {
 }
 
 #[derive(Clone, Debug)]
-struct FunctionSearchType {
+pub struct FunctionSearchType {
     function: (MoveFunction, String),
     contains: bool,
 }
@@ -214,11 +208,13 @@ pub fn read_to_knot_finder(filename: String) -> KnotFinder {
     )
     .unwrap();
 
-    let tokens: Vec<_> = re
+    let mut tokens = re
         .find_iter(text)
         .map(|capture| capture.as_str().to_string())
-        .collect();
-    let a = KnotFinder(parse_expr(&mut tokens.into_iter().peekable()).unwrap());
+        .collect::<Vec<_>>().into_iter().peekable();
+    let a = KnotFinder(parse_expr(&mut tokens).unwrap());
+
+    assert_eq!(tokens.peek(), None, "Parser failed");
     a
 }
 

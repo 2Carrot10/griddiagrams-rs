@@ -206,7 +206,21 @@ pub fn h_to_v(horzlist: &DirList) -> DirList {
     v_to_h(horzlist)
 }
 
+pub fn is_valid(dirlist: &DirList) -> bool {
+    let len = dirlist.0.len();
+    let mut x_binsum = 0;
+    let mut y_binsum = 0;
+    for (x, o) in &dirlist.0 {
+        if (*x as usize) >= len || (*o as usize) >= len {
+            return false
+        }
 
+        x_binsum |= 1 << x;
+        y_binsum |= 1 << x;
+    }
+
+    ((x_binsum + 1) == (1 << len)) && ((y_binsum + 1) == (1 << len))
+}
 
 /// Calculate the winding matrix for a knot grid diagram.
 ///

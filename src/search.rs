@@ -8,10 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    LoggingType,
-    knot_core::{DirList, Permutation, WindingMatrix, try_permutations},
-    knot_finder_grammer::KnotFinder,
-    reidemiester::{knot_commute, knot_switch},
+    knot_core::{is_valid, try_permutations, DirList, Permutation, WindingMatrix}, knot_finder_grammer::KnotFinder, reidemiester::{knot_commute, knot_switch}, LoggingType
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,11 +43,11 @@ pub fn manual_gridstate_finder(
     let single_line = matches!(logging, LoggingType::SingleLine);
 
     let mut current_states = vertlists;
-    // let mut previous_states = HashSet::new(); // Only keeps the last iteration
+    let mut previous_frontier_size = 0;
+    let mut global_states = HashSet::new(); // Only keeps the last iteration
     let mut i = 0;
     // println!("New knots");
-    while let Some((knot_finding_function, name)) = knot_finder.next() {
-        println!("{}", name);
+    while let Some((knot_finding_function, move_name)) = knot_finder.next() {
         // println!("Current states");
         // for s in &current_states {
         //     println!("{:?}",s);
@@ -65,69 +62,72 @@ pub fn manual_gridstate_finder(
             return Ok(record);
         }
 
-        // if do_logging {
-        //     gridstate_log(&current_states, i, previous_states.len(), single_line);
-        // }
-
-        current_states = current_states;
-        //     .par_iter()
-        //     .flat_map(|r| knot_finding_function(&r))
-        //     .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
-        //     .collect::<HashSet<_>>();
-
-        if current_states.is_empty() {
-            return Err(SearchFailure::ExhaustedSearchSpace);
-        }
-
-        // previous_states.extend(current_states.clone());
-        i += 1;
-    }
-
-    Err(SearchFailure::HitDepthLimit)
-}
-
-pub fn legacy_gridstate_finder_commute_with_visited(
-    vertlists: HashSet<DirList>,
-    n: i32,
-    logging: &LoggingType,
-) -> Result<SearchRecord, SearchFailure> {
-    let do_logging = !matches!(logging, LoggingType::None);
-    let single_line = matches!(logging, LoggingType::SingleLine);
-
-    let mut current_states = vertlists;
-    let mut previous_states = HashSet::new(); // Only keeps the last iteration
-    for i in 0..n {
-        if let Some(record) = current_states
-            .par_iter()
-            .filter_map(try_permutations)
-            .find_any(|_| true)
-        {
-            return Ok(record);
-        }
-
         if do_logging {
-            gridstate_log(&current_states, i, previous_states.len(), single_line);
+            gridstate_log(&current_states, i, previous_frontier_size, single_line, &move_name);
         }
 
+        println!("Is all good: {}", current_states.par_iter().map(is_valid).all(|x| x));
+
+        previous_frontier_size = current_states.len();
         current_states = current_states
             .par_iter()
-            .flat_map(|r| {
-                let mut a = knot_commute(&r);
-                a.extend(knot_switch(&r));
-                a
-            })
-            .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
+            .flat_map(|r| knot_finding_function(&r))
+            .filter(|a| !current_states.contains(a) && !global_states.contains(a))
             .collect::<HashSet<_>>();
 
         if current_states.is_empty() {
             return Err(SearchFailure::ExhaustedSearchSpace);
         }
 
-        previous_states.extend(current_states.clone());
+        global_states.extend(current_states.clone());
+        i += 1;
     }
 
     Err(SearchFailure::HitDepthLimit)
 }
+
+// pub fn legacy_gridstate_finder_commute_with_visited(
+//     vertlists: HashSet<DirList>,
+//     n: i32,
+//     logging: &LoggingType,
+// ) -> Result<SearchRecord, SearchFailure> {
+//     let do_logging = !matches!(logging, LoggingType::None);
+//     let single_line = matches!(logging, LoggingType::SingleLine);
+// 
+//     let mut current_states = vertlists;
+//     let mut previous_states = HashSet::new(); // Only keeps the last iteration
+//     for i in 0..n {
+//         if let Some(record) = current_states
+//             .par_iter()
+//             .filter_map(try_permutations)
+//             .find_any(|_| true)
+//         {
+//             return Ok(record);
+//         }
+// 
+//         if do_logging {
+//             gridstate_log(&current_states, i, previous_states.len(), single_line, name);
+//         }
+// 
+//         current_states = current_states
+//             .par_iter()
+//             .flat_map(|r| {
+//                 let mut a = knot_commute(&r);
+//                 a.extend(knot_switch(&r));
+//                 a
+//             })
+//             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
+//             .collect::<HashSet<_>>();
+// 
+//         if current_states.is_empty() {
+//             return Err(SearchFailure::ExhaustedSearchSpace);
+//         }
+// 
+//         previous_states.extend(current_states.clone());
+//     }
+// 
+//     Err(SearchFailure::HitDepthLimit)
+// }
 
 // pub fn gridstate_finder_stab(
 //     vertlist: DirList,
@@ -159,6 +159,7 @@ fn gridstate_log(
     iteration: i32,
     previous_states_len: usize,
     single_line: bool,
+    move_name: &str
 ) {
     print!("{:<5}  ", iteration);
     print!("Size of the frontier: {:<10}", current_states.len());
@@ -171,6 +172,7 @@ fn gridstate_log(
         "-".repeat(30 - format_blocks)
     );
     print!("Ratio change: {:.2}%", 100.0 * ratio);
+    print!("    {}", move_name);
 
     if single_line {
         print!("\r");

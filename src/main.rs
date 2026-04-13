@@ -13,18 +13,16 @@ use std::{
 };
 
 use clap::Parser;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    knot_finder_grammer::{
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, knot_core::DirList, knot_finder_grammer::{
         commute_search, read_to_knot_finder, stab_search, KnotFinder, ListSearchType, RepeatSearchType, SearchType
-    },
-    reidemiester::{knot_commute, knot_stab},
-    search::{
-        legacy_gridstate_finder_commute_with_visited, manual_gridstate_finder, KnotResult, SearchFailure
-    },
+    }, reidemiester::{knot_commute, knot_stab}, search::{
+        manual_gridstate_finder, KnotResult, SearchFailure
+    }
 };
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
@@ -167,7 +165,6 @@ fn main() {
             }
         }
 
-        // legacy_gridstate_finder_commute_with_visited(HashSet::from([vertlist]), args.depth, &logging_type);
         let mut search_record = manual_gridstate_finder(
             HashSet::from([vertlist]),
             &logging_type,
@@ -301,4 +298,36 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
         .collect();
 
     return keys
+}
+
+fn string_to_vertmap(text: String) -> DirList {
+    let mut out: DirList = DirList(vec![]);
+
+    let re = Regex::new(
+        r#"(?x)
+        \d+                             |
+        [[[:alpha:]]\_]+                |
+        '.+?'                           |
+        ".*"+?                          |
+        [=+*/%&|<>!?^~\#\-]+   |
+        [\(\)\[\]\{\}.\:;,@]|
+        \p{Letter}
+        "#,
+    ).unwrap();
+
+    let mut tokens = re
+        .find_iter(&text)
+        .map(|capture| capture.as_str().to_string())
+        .collect::<Vec<_>>().into_iter().peekable();
+
+    assert_eq!(tokens.next().as_deref(), Some("["));
+    while tokens.peek().map(|s| s.as_str()) != Some("]") {
+        assert_eq!(tokens.next().as_deref(), Some("("));
+        let x = tokens.next().unwrap().parse::<i32>().unwrap();
+        assert_eq!(tokens.next().as_deref(), Some(","));
+        let o = tokens.next().unwrap().parse::<i32>().unwrap();
+        assert_eq!(tokens.next().as_deref(), Some(")"));
+        out.0.push((x, o));
+    }
+    out
 }
