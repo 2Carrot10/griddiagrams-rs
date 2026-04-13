@@ -46,14 +46,8 @@ pub fn manual_gridstate_finder(
     let mut previous_frontier_size = 0;
     let mut global_states = HashSet::new(); // Only keeps the last iteration
     let mut i = 0;
-    // println!("New knots");
-    while let Some((knot_finding_function, move_name)) = knot_finder.next() {
-        // println!("Current states");
-        // for s in &current_states {
-        //     println!("{:?}",s);
-        //     println!("{}",s);
-        // }
 
+    while let Some((knot_finding_function, move_name)) = knot_finder.next() {
         if let Some(record) = current_states
             .par_iter()
             .filter_map(try_permutations)
@@ -65,8 +59,6 @@ pub fn manual_gridstate_finder(
         if do_logging {
             gridstate_log(&current_states, i, previous_frontier_size, single_line, &move_name);
         }
-
-        println!("Is all good: {}", current_states.par_iter().map(is_valid).all(|x| x));
 
         previous_frontier_size = current_states.len();
         current_states = current_states

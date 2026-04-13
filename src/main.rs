@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, knot_core::DirList, knot_finder_grammer::{
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, knot_core::{is_valid, DirList}, knot_finder_grammer::{
         commute_search, read_to_knot_finder, stab_search, KnotFinder, ListSearchType, RepeatSearchType, SearchType
     }, reidemiester::{knot_commute, knot_stab}, search::{
         manual_gridstate_finder, KnotResult, SearchFailure
@@ -133,6 +133,11 @@ fn main() {
         {
             get_all_knot_names(&csv)[start as usize..end as usize].to_vec()
         }
+        // string
+        //     if string
+        //         .chars()[0] == "["  
+        // {
+        // }
         names => names.split(",").map(|a| a.trim().to_string()).collect(),
     };
 
@@ -329,5 +334,6 @@ fn string_to_vertmap(text: String) -> DirList {
         assert_eq!(tokens.next().as_deref(), Some(")"));
         out.0.push((x, o));
     }
+    assert!(is_valid(&out), "Diagram is not a valid knot");
     out
 }

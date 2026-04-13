@@ -57,7 +57,7 @@ impl AlgorithmGrammer for UnionSearchType {
         }
         let mut name: String = "".to_string();
         for (_, new_name) in &self.contains {
-            name = format!("{}, {}", name, new_name);
+            name = format!("{} | {}", name, new_name);
         }
 
         let contains = self.contains.clone();
