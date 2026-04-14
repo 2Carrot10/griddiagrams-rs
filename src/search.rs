@@ -8,7 +8,9 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    knot_core::{try_permutations, DirList, Permutation, WindingMatrix}, knot_finder_grammer::KnotFinder, LoggingType
+    LoggingType,
+    knot_core::{DirList, Permutation, WindingMatrix, try_permutations},
+    knot_finder_grammer::KnotFinder,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,7 +35,6 @@ pub struct KnotResult {
     pub search_record: Result<SearchRecord, SearchFailure>,
 }
 
-/// Helper function: gridstate_finder_commute that respects a global visited set.
 pub fn manual_gridstate_finder(
     vertlists: HashSet<DirList>,
     logging: &LoggingType,
@@ -44,118 +45,55 @@ pub fn manual_gridstate_finder(
 
     let mut current_states = vertlists;
     let mut previous_frontier_size = 0;
-    let mut global_states = current_states.clone();
+    let mut visited_states = current_states.clone();
     let mut i = 0;
 
     while let Some((knot_finding_function, move_name)) = knot_finder.next() {
         if let Some(record) = current_states
             .par_iter()
-            .filter_map(try_permutations)
+            .filter_map(|a| try_permutations(a).ok())
             .find_any(|_| true)
         {
             return Ok(record);
         }
 
         if do_logging {
-            gridstate_log(&current_states, i, previous_frontier_size, single_line, &move_name);
+            gridstate_log(
+                &current_states,
+                i,
+                previous_frontier_size,
+                single_line,
+                &move_name,
+            );
         }
 
         previous_frontier_size = current_states.len();
         current_states = current_states
             .par_iter()
             .flat_map(|r| knot_finding_function(&r))
-            .filter(|a| !current_states.contains(a) && !global_states.contains(a))
+            .filter(|a| !current_states.contains(a) && !visited_states.contains(a))
             .collect::<HashSet<_>>();
 
         if current_states.is_empty() {
             return Err(SearchFailure::ExhaustedSearchSpace);
         }
 
-        global_states.extend(current_states.clone());
+        visited_states.extend(current_states.clone());
         i += 1;
     }
 
     Err(SearchFailure::HitDepthLimit)
 }
 
-// pub fn legacy_gridstate_finder_commute_with_visited(
-//     vertlists: HashSet<DirList>,
-//     n: i32,
-//     logging: &LoggingType,
-// ) -> Result<SearchRecord, SearchFailure> {
-//     let do_logging = !matches!(logging, LoggingType::None);
-//     let single_line = matches!(logging, LoggingType::SingleLine);
-// 
-//     let mut current_states = vertlists;
-//     let mut previous_states = HashSet::new(); // Only keeps the last iteration
-//     for i in 0..n {
-//         if let Some(record) = current_states
-//             .par_iter()
-//             .filter_map(try_permutations)
-//             .find_any(|_| true)
-//         {
-//             return Ok(record);
-//         }
-// 
-//         if do_logging {
-//             gridstate_log(&current_states, i, previous_states.len(), single_line, name);
-//         }
-// 
-//         current_states = current_states
-//             .par_iter()
-//             .flat_map(|r| {
-//                 let mut a = knot_commute(&r);
-//                 a.extend(knot_switch(&r));
-//                 a
-//             })
-//             .filter(|a| !current_states.contains(a) && !previous_states.contains(a))
-//             .collect::<HashSet<_>>();
-// 
-//         if current_states.is_empty() {
-//             return Err(SearchFailure::ExhaustedSearchSpace);
-//         }
-// 
-//         previous_states.extend(current_states.clone());
-//     }
-// 
-//     Err(SearchFailure::HitDepthLimit)
-// }
-
-// pub fn gridstate_finder_stab(
-//     vertlist: DirList,
-//     n: i32,
-//     logging: &LoggingType,
-// ) -> Result<SearchRecord, SearchFailure> {
-//     let mut grid_stab_combos = vec![];
-//     for segment in vertlist.0.clone() {
-//         for (index, dir) in STAB_COMBINATIONS {
-//             grid_stab_combos.push((segment, dir, index));
-//         }
-//     }
-//     let gridstates_after_stab: HashSet<_> = grid_stab_combos
-//         .into_iter()
-//         .map(|(segment, dir, index)| stabilize(vertlist.clone(), segment, dir, index))
-//         .collect();
-//
-//     let mut result = manaual_gridstate_finder(gridstates_after_stab, n, logging, knot_commute);
-//
-//     if let Ok(ref mut record) = result {
-//         record.stabilizations = 1;
-//     }
-//
-//     result
-// }
-
 fn gridstate_log(
     current_states: &HashSet<DirList>,
     iteration: i32,
     previous_states_len: usize,
     single_line: bool,
-    move_name: &str
+    move_name: &str,
 ) {
     print!("{:<5}  ", iteration);
     print!("Size of the frontier: {:<10}", current_states.len());
-    // print!("Size of the global: {:<10}", global_visited.len());
     let ratio = (current_states.len() as f32) / (previous_states_len as f32);
     let format_blocks = min(30, (ratio * 10.0) as usize);
     print!(

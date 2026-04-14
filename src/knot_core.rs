@@ -54,8 +54,17 @@ impl<'de> Deserialize<'de> for GridNotationContainer {
 }
 
 // Either VertList or HorzList
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct DirList(pub Vec<(i32, i32)>);
+
+impl PartialEq for DirList {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+            || self.0 == v_to_h(other).0
+            || self.0.clone().into_iter().rev().collect::<Vec<_>>() == other.0
+            || self.0.clone().into_iter().rev().collect::<Vec<_>>() == v_to_h(other).0
+    }
+}
 
 pub enum Dir {
     Horz,
@@ -64,6 +73,10 @@ pub enum Dir {
 
 pub type Permutation = Vec<usize>;
 pub type WindingMatrix = Vec<Vec<i32>>;
+#[derive(PartialOrd, PartialEq)]
+pub struct PermutationCloseness {
+    steps: f32, // percentage of steps that are correct
+}
 
 pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
     if gridnotation.len() == 0 {
@@ -212,7 +225,7 @@ pub fn is_valid(dirlist: &DirList) -> bool {
     let mut y_binsum = 0;
     for (x, o) in &dirlist.0 {
         if (*x as usize) >= len || (*o as usize) >= len {
-            return false
+            return false;
         }
 
         x_binsum |= 1 << x;
@@ -273,9 +286,12 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
 // -------
 // List[int] or str
 //     Permutation if unique one exists, error message otherwise.
-pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permutation, String> {
+pub fn type_0_permutation(
+    matrix: WindingMatrix,
+    direction: Dir,
+) -> Result<Permutation, PermutationCloseness> {
     let matrix = if let Dir::Vert = direction {
-       transpose(matrix)
+        transpose(matrix)
     } else {
         matrix
     };
@@ -299,6 +315,7 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
         .collect();
     let mut result = vec![None; n];
 
+    let mut i = 0 as f32;
     while min_indices.iter().any(|s| s.is_some()) {
         let singleton_index = min_indices
             .iter()
@@ -309,10 +326,9 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
 
         match singleton_index {
             None => {
-                return Err(String::from(format!(
-                    "No unique {} permutation exists.",
-                    type_string
-                )));
+                return Err(PermutationCloseness {
+                    steps: i / (n as f32),
+                });
             }
             Some(singleton_index) => {
                 // X is the first element in the singleton set
@@ -338,13 +354,14 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Result<Permu
                     .iter()
                     .any(|s| s.as_ref().map_or(false, |a| a.is_empty()))
                 {
-                    return Err(String::from(format!(
-                        "No unique {} permutation exists.",
-                        type_string
-                    )));
+                    return Err(PermutationCloseness {
+                        steps: i / (n as f32),
+                    });
                 }
             }
         }
+
+        i += 1 as f32;
     }
 
     let result: Vec<usize> = result
@@ -475,9 +492,16 @@ pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
 /// -----
 /// This function tries both the original and reversed orientation,
 /// checking for both horizontal and vertical perfect grid states.
-pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
+pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationCloseness> {
     // try_instance_permutations Does not attempt reversed
-    fn try_instance_permutations(vertlist: DirList, is_reversed: bool) -> Option<SearchRecord> {
+    fn try_instance_permutations(
+        vertlist: DirList,
+        is_reversed: bool,
+    ) -> Result<SearchRecord, PermutationCloseness> {
+        let mut best_closeness_record = PermutationCloseness {
+            steps: 0.0,
+        };
+
         let matrix = w_matrix(vertlist.clone());
         let rowsum = matrix
             .clone()
@@ -491,49 +515,68 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
             .sum::<i32>();
 
         if rowsum >= colsum {
-            if let Ok(h_perm) = type_0_permutation(matrix.clone(), Dir::Horz) {
-                return Some(SearchRecord {
-                    stabilizations: 0,
-                    vlist: vertlist.clone(),
-                    alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
-                    matrix: matrix.clone(),
-                    gridstate: h_perm.clone(),
-                    perm_type: if is_reversed {
-                        String::from("h_type_0")
-                    } else {
-                        String::from("h_type_0_rev")
-                    },
-                });
+            match type_0_permutation(matrix.clone(), Dir::Horz) {
+                Ok(h_perm) => {
+                    return Ok(SearchRecord {
+                        stabilizations: 0,
+                        vlist: vertlist.clone(),
+                        alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
+                        matrix: matrix.clone(),
+                        gridstate: h_perm.clone(),
+                        perm_type: if is_reversed {
+                            String::from("h_type_0")
+                        } else {
+                            String::from("h_type_0_rev")
+                        },
+                    });
+                }
+                Err(c) => {
+                    best_closeness_record = c;
+                }
             }
         }
 
         if colsum >= rowsum {
-            if let Ok(v_perm) = type_0_permutation(matrix.clone(), Dir::Vert) {
-                let h_perm = vperm_to_hperm(v_perm);
-                return Some(SearchRecord {
-                    stabilizations: 2,
-                    vlist: vertlist.clone(),
-                    alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
-                    matrix: matrix.clone(),
-                    gridstate: h_perm.clone(),
-                    perm_type: if is_reversed {
-                        String::from("v_type_0")
+            match type_0_permutation(matrix.clone(), Dir::Vert) {
+                Ok(h_perm) => {
+                    return Ok(SearchRecord {
+                        stabilizations: 0,
+                        vlist: vertlist.clone(),
+                        alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
+                        matrix: matrix.clone(),
+                        gridstate: h_perm.clone(),
+                        perm_type: if is_reversed {
+                            String::from("v_type_0")
+                        } else {
+                            String::from("v_type_0_rev")
+                        },
+                    });
+                }
+                Err(c) => {
+                    best_closeness_record = if c.steps > best_closeness_record.steps {
+                        c
                     } else {
-                        String::from("v_type_0_rev")
-                    },
-                });
+                        best_closeness_record
+                    };
+                }
             }
         }
 
-        None
+        Err(best_closeness_record)
     }
 
-    if let Some(p) = try_instance_permutations(vertlist.clone(), false) {
-        Some(p)
-    } else if let Some(p) = try_instance_permutations(rev(vertlist.clone()), true) {
-        Some(p)
-    } else {
-        None
+    match try_instance_permutations(vertlist.clone(), false) {
+        Ok(p) => Ok(p),
+        Err(err) => match try_instance_permutations(rev(vertlist.clone()), true) {
+            Ok(p) => Ok(p),
+            Err(err2) => {
+                if err.steps > err2.steps {
+                    Err(err)
+                } else {
+                    Err(err2)
+                }
+            }
+        },
     }
 }
 
@@ -573,7 +616,6 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
 
     return (x, o);
 }
-
 
 impl Display for DirList {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

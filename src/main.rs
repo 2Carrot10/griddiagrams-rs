@@ -4,7 +4,7 @@ mod knot_core;
 mod knot_finder_grammer;
 mod reidemiester;
 mod search;
-mod tests;
+mod vis;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -14,6 +14,7 @@ use std::{
 use clap::Parser;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
@@ -21,10 +22,7 @@ use crate::{
     search::{KnotResult, SearchFailure, manual_gridstate_finder},
 };
 
-use crate::knot_finder_grammer::{
-        commute_search,
-        read_to_knot_finder, stab_search,
-    };
+use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_search};
 
 const UNSOLVED_KNOT_NAMES: [&str; 12] = [
     "12n_79", "12n_168", "13n_282", "13n_917", "13n_1279", "13n_1281", "13n_1413", "13n_1826",
@@ -80,6 +78,9 @@ struct Args {
 
     #[arg(long)]
     hide_diagrams: bool,
+
+    #[arg(long)]
+    verbose_output: bool,
 }
 
 pub enum LoggingType {
@@ -200,10 +201,12 @@ fn main() {
         match &mut search_record {
             Ok(ok) => {
                 if log_positives {
-                    println!("Found nice knot for: {}, #{}", knot, i);
+                    println!("Found nice knot for {}, #{}: {:?}", knot, i, ok.vlist.0);
 
-                    if !args.hide_diagrams {
-                        println!("{}", ok.vlist);
+                    if !matches!(logging_type, LoggingType::None) {
+                        if !args.hide_diagrams {
+                            println!("{}", ok.vlist);
+                        }
                     }
                 }
             }
@@ -234,7 +237,11 @@ fn main() {
         compute_analytics(&results);
     }
     if let Some(output_dir) = args.output {
+        if args.verbose_output { 
+        save_results_verbose(output_dir, &results);
+        } else {
         save_results(output_dir, &results);
+        }
     }
 }
 
@@ -320,9 +327,7 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
         .keys()
         .filter_map(|key| match json_string.get(key).and_then(|v| v.as_str()) {
             Some("space exhausted error") | Some("depth error") => Some(key.clone()),
-            Some(_) => {
-                None
-            }
+            Some(_) => None,
             None => None,
         })
         .collect();
@@ -367,4 +372,34 @@ fn string_to_vertmap(text: String) -> DirList {
     }
     assert!(is_valid(&out), "Diagram is not a valid knot");
     out
+}
+
+#[allow(dead_code)]
+fn save_results_verbose(file_name: String, results: &Vec<KnotResult>) {
+    let mut map: HashMap<String, serde_json::Value> = HashMap::new();
+
+    for result in results {
+        map.insert(result.knot.clone(), match result {
+            KnotResult {
+                search_record: Ok(record),
+                knot: _,
+            } => 
+                json!({
+                    "vlist": record.vlist,
+                    "winding-matrix": record.matrix,
+                    "gridstate": record.gridstate
+                }),
+            KnotResult {
+                search_record: Err(SearchFailure::HitDepthLimit),
+                knot: _,
+            } => serde_json::from_str("depth error").unwrap(),
+            KnotResult {
+                search_record: Err(SearchFailure::ExhaustedSearchSpace),
+                knot: _,
+            } => serde_json::from_str("space exhausted error").unwrap(),
+        }
+        );
+    }
+
+    let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
 }
