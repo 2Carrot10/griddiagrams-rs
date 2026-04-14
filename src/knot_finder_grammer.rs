@@ -330,7 +330,6 @@ fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Searc
                 }
                 "{" | "[" | "(" => {
                     let a = parse_parens(tokens).unwrap();
-                    println!("right after");
                     a
                 }
                 _ => break,
