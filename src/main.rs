@@ -401,5 +401,5 @@ fn save_results_verbose(file_name: String, results: &Vec<KnotResult>) {
         );
     }
 
-    let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
+    let _ = fs::write(file_name, &serde_json::to_string(&map).unwrap());
 }

@@ -10,8 +10,8 @@ use regex::Regex;
 type MoveFunction = fn(&DirList) -> Vec<DirList>;
 type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<DirList> + Sync>;
 
-trait AlgorithmGrammer {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String)>;
+trait AlgorithmGrammar {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)>;
 }
 
 #[derive(Clone, Debug)]
@@ -28,8 +28,9 @@ impl ListSearchType {
         }
     }
 }
-impl AlgorithmGrammer for ListSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+
+impl AlgorithmGrammar for ListSearchType {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
         if self.curr < self.contains.len() {
             let result = &mut self.contains[self.curr];
             if let Some(some) = result.next() {
@@ -46,13 +47,25 @@ impl AlgorithmGrammer for ListSearchType {
 }
 
 #[derive(Clone, Debug)]
+pub struct VisitedDedup(Box<SearchType>);
+impl AlgorithmGrammar for VisitedDedup {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
+        if let Some(result) = self.0.next() {
+            Some((result.0, result.1, false))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct UnionSearchType {
     pub contains: Vec<(MoveFunction, String)>,
     current: bool,
 }
 
-impl AlgorithmGrammer for UnionSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+impl AlgorithmGrammar for UnionSearchType {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
         if !self.current {
             self.current = !self.current;
             return None;
@@ -82,6 +95,7 @@ impl AlgorithmGrammer for UnionSearchType {
                 out
             }),
             name,
+            true,
         ))
     }
 }
@@ -93,8 +107,8 @@ pub struct RepeatSearchType {
     pub curr: i32,
 }
 
-impl AlgorithmGrammer for RepeatSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+impl AlgorithmGrammar for RepeatSearchType {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
         if self.curr < self.count {
             if let Some(some) = self.contains.next() {
                 Some(some)
@@ -111,25 +125,29 @@ impl AlgorithmGrammer for RepeatSearchType {
 
 #[derive(Clone, Debug)]
 pub struct FunctionSearchType {
-    function: (MoveFunction, String),
+    function: (MoveFunction, String, bool),
     contains: bool,
 }
 impl FunctionSearchType {
     pub fn new(func: MoveFunction, name: String) -> Self {
         FunctionSearchType {
-            function: (func, name),
+            function: (func, name, true),
             contains: true,
         }
     }
 }
 
-impl AlgorithmGrammer for FunctionSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+impl AlgorithmGrammar for FunctionSearchType {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
         self.contains = !self.contains;
         if self.contains {
             None
         } else {
-            Some((Box::new(self.function.0.clone()), self.function.1.clone()))
+            Some((
+                Box::new(self.function.0.clone()),
+                self.function.1.clone(),
+                self.function.2,
+            ))
         }
     }
 }
@@ -140,15 +158,17 @@ pub enum SearchType {
     Repeat(RepeatSearchType),
     List(ListSearchType),
     Union(UnionSearchType),
+    VisitedDedup(VisitedDedup),
 }
 
-impl AlgorithmGrammer for SearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+impl AlgorithmGrammar for SearchType {
+    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
         match self {
             SearchType::Function(f) => f.next(),
             SearchType::Repeat(f) => f.next(),
             SearchType::List(f) => f.next(),
             SearchType::Union(f) => f.next(),
+            SearchType::VisitedDedup(f) => f.next(),
         }
     }
 }
@@ -157,7 +177,7 @@ impl AlgorithmGrammer for SearchType {
 pub struct KnotFinder(pub SearchType);
 
 impl KnotFinder {
-    pub fn next(&mut self) -> Option<(DynamicMoveFunction, String)> {
+    pub fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
         self.0.next()
     }
 
@@ -227,10 +247,11 @@ pub fn read_to_knot_finder(filename: String) -> KnotFinder {
         .collect::<Vec<_>>()
         .into_iter()
         .peekable();
-    let a = KnotFinder(parse_expr(&mut tokens).unwrap());
+    let knot_finder = KnotFinder(parse_expr(&mut tokens).unwrap());
 
     assert_eq!(tokens.peek(), None, "Parser failed");
-    a
+    // println!("{:?}", knot_finder);
+    knot_finder
 }
 
 fn parse_union(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
@@ -279,12 +300,19 @@ fn parse_parens(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Sea
         return result;
     }
 
+    // Deduplicate
+    if consume_if_equals(tokens, "<") {
+        let result = parse_expr(tokens);
+        assert_eq!(tokens.next(), Some(">".to_string()));
+        return result.map(|a| SearchType::VisitedDedup(VisitedDedup(Box::new(a))));
+    }
+
     if consume_if_equals(tokens, "{") {
         let result = parse_union(tokens);
         assert_eq!(tokens.next(), Some("}".to_string()));
         return result;
     }
-    panic!("Expected '{{' or '['. (this is likely an issue with the Rust code)");
+    panic!("Expected '{{', '[', or '<'. (this is likely an issue with the Rust code)");
 }
 
 fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<SearchType> {
@@ -328,7 +356,7 @@ fn parse_expr(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Searc
                         String::from("destab"),
                     ))
                 }
-                "{" | "[" | "(" => {
+                "{" | "[" | "(" | "<" => {
                     let a = parse_parens(tokens).unwrap();
                     a
                 }

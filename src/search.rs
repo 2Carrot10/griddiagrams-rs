@@ -48,7 +48,7 @@ pub fn manual_gridstate_finder(
     let mut visited_states = current_states.clone();
     let mut i = 0;
 
-    while let Some((knot_finding_function, move_name)) = knot_finder.next() {
+    while let Some((knot_finding_function, move_name, dedup)) = knot_finder.next() {
         if let Some(record) = current_states
             .par_iter()
             .filter_map(|a| try_permutations(a).ok())
@@ -64,21 +64,29 @@ pub fn manual_gridstate_finder(
                 previous_frontier_size,
                 single_line,
                 &move_name,
+                dedup
             );
         }
 
         previous_frontier_size = current_states.len();
-        current_states = current_states
-            .par_iter()
-            .flat_map(|r| knot_finding_function(&r))
-            .filter(|a| !current_states.contains(a) && !visited_states.contains(a))
-            .collect::<HashSet<_>>();
+        if dedup {
+            current_states = current_states
+                .par_iter()
+                .flat_map(|r| knot_finding_function(&r))
+                .filter(|a| !current_states.contains(a) && !visited_states.contains(a))
+                .collect::<HashSet<_>>();
 
-        if current_states.is_empty() {
-            return Err(SearchFailure::ExhaustedSearchSpace);
+            if current_states.is_empty() {
+                return Err(SearchFailure::ExhaustedSearchSpace);
+            }
+
+            visited_states.extend(current_states.clone());
+        } else {
+            current_states.extend(current_states
+                .par_iter()
+                .flat_map(|r| knot_finding_function(&r))
+                .collect::<HashSet<_>>());
         }
-
-        visited_states.extend(current_states.clone());
         i += 1;
     }
 
@@ -91,6 +99,7 @@ fn gridstate_log(
     previous_states_len: usize,
     single_line: bool,
     move_name: &str,
+    dedup: bool,
 ) {
     print!("{:<5}  ", iteration);
     print!("Size of the frontier: {:<10}", current_states.len());
@@ -102,7 +111,7 @@ fn gridstate_log(
         "-".repeat(30 - format_blocks)
     );
     print!("Ratio change: {:.2}%", 100.0 * ratio);
-    print!("    {}", move_name);
+    print!("    {} {}", move_name, if dedup { "de-duplicate" } else { "preserve-all" });
 
     if single_line {
         print!("\r");

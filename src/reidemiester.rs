@@ -39,6 +39,7 @@ impl StabDir {
         }
     }
 }
+
 pub fn adj_elementwise_move_on_predicate(
     input_list: &DirList,
     preciate: impl Fn((i32, i32), (i32, i32)) -> bool,
