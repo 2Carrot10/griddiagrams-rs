@@ -72,10 +72,10 @@ pub fn manual_gridstate_finder(
 
             visited_states.extend(current_states.clone());
         } else {
-            current_states.extend(current_states
+            current_states = current_states
                 .par_iter()
                 .flat_map(|r| knot_finding_function(&r))
-                .collect::<HashSet<_>>());
+                .collect::<HashSet<_>>();
         }
         i += 1;
 
