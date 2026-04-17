@@ -43,12 +43,14 @@ pub fn manual_gridstate_finder(
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::SingleLine);
 
+    let mut previous_frontier_size = vertlists.len();
     let mut current_states = vertlists;
-    let mut previous_frontier_size = 0;
     let mut visited_states = current_states.clone();
     let mut i = 0;
 
     while let Some((knot_finding_function, move_name, dedup)) = knot_finder.next() {
+        previous_frontier_size = current_states.len();
+
         if let Some(record) = current_states
             .par_iter()
             .filter_map(|a| try_permutations(a).ok())
@@ -57,18 +59,6 @@ pub fn manual_gridstate_finder(
             return Ok(record);
         }
 
-        if do_logging {
-            gridstate_log(
-                &current_states,
-                i,
-                previous_frontier_size,
-                single_line,
-                &move_name,
-                dedup
-            );
-        }
-
-        previous_frontier_size = current_states.len();
         if dedup {
             current_states = current_states
                 .par_iter()
@@ -88,6 +78,17 @@ pub fn manual_gridstate_finder(
                 .collect::<HashSet<_>>());
         }
         i += 1;
+
+        if do_logging {
+            gridstate_log(
+                &current_states,
+                i,
+                previous_frontier_size,
+                single_line,
+                &move_name,
+                dedup
+            );
+        }
     }
 
     Err(SearchFailure::HitDepthLimit)
