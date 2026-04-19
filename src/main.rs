@@ -24,9 +24,8 @@ use crate::{
 
 use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_search};
 
-const UNSOLVED_KNOT_NAMES: [&str; 12] = [
-    "12n_79", "12n_168", "13n_282", "13n_917", "13n_1279", "13n_1281", "13n_1413", "13n_1826",
-    "13n_2915", "13n_3089", "13n_3904", "13n_3932",
+const UNSOLVED_KNOT_NAMES: [&str; 4] = [
+    "13n_917", "13n_1279", "13n_1281", "13n_3904"
 ];
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -190,7 +189,7 @@ fn main() {
         }
 
         let mut search_record = manual_gridstate_finder(
-            HashSet::from([vertlist]),
+           vertlist,
             &logging_type,
             knot_finder.clone(),
         );
@@ -386,8 +385,6 @@ fn save_results_verbose(file_name: String, results: &Vec<KnotResult>) {
             } => 
                 json!({
                     "vlist": record.vlist,
-                    "winding-matrix": record.matrix,
-                    "gridstate": record.gridstate
                 }),
             KnotResult {
                 search_record: Err(SearchFailure::HitDepthLimit),

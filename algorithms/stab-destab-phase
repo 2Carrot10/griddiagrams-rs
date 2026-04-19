@@ -1,6 +1,6 @@
 4 (
 	stab
-	< 5 { switch } >
+	< 5 { switch epsilon } >
 	< destab >
 	( 10 {commute switch })
 )

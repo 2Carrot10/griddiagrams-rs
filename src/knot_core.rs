@@ -1,7 +1,9 @@
+use std::cmp::Ordering;
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::iter;
+use rand::Rng; // 0.8.5
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -73,9 +75,60 @@ pub enum Dir {
 
 pub type Permutation = Vec<usize>;
 pub type WindingMatrix = Vec<Vec<i32>>;
-#[derive(PartialOrd, PartialEq)]
+#[derive(PartialEq, PartialOrd, Eq, Clone, Debug)]
 pub struct PermutationCloseness {
-    steps: f32, // percentage of steps that are correct
+    pub steps: i32,                // number of steps that are correct
+    pub total: i32,                // the total number of steps that must be accomplished
+    pub number_of_duplicates: i32, // at last step
+}
+
+// 1. Manual Equality Implementation
+impl Ord for PermutationCloseness {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let other_ratio = self.steps / self.total;
+        let this_ratio  = other.steps / other.total;
+        match this_ratio.cmp(&other_ratio) {
+            Ordering::Equal => self.number_of_duplicates.cmp(&other.number_of_duplicates),
+            other => other
+            // base => base,
+        }
+    }
+}
+
+#[derive(Clone, Eq, Debug)]
+pub struct TaggedDirList {
+    pub closeness: Option<PermutationCloseness>,
+    pub dirlist: DirList,
+}
+
+impl Ord for TaggedDirList {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.closeness.cmp(&other.closeness)
+    }
+}
+impl TaggedDirList {
+    pub fn tag(dirlist: DirList) -> Self {
+        TaggedDirList {
+            closeness: None,
+            dirlist,
+        }
+    }
+    pub fn new(dirlist: DirList, closeness: Option<PermutationCloseness>) -> Self {
+        TaggedDirList { closeness, dirlist }
+    }
+}
+
+impl PartialOrd for TaggedDirList {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // rand::random::<i32>().partial_cmp(&rand::random::<i32>())
+        self.closeness.partial_cmp(&other.closeness)
+    }
+}
+
+impl PartialEq for TaggedDirList {
+    fn eq(&self, other: &Self) -> bool {
+        self.closeness == other.closeness
+    }
 }
 
 pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
@@ -315,7 +368,7 @@ pub fn type_0_permutation(
         .collect();
     let mut result = vec![None; n];
 
-    let mut i = 0 as f32;
+    let mut i = 0;
     while min_indices.iter().any(|s| s.is_some()) {
         let singleton_index = min_indices
             .iter()
@@ -327,7 +380,13 @@ pub fn type_0_permutation(
         match singleton_index {
             None => {
                 return Err(PermutationCloseness {
-                    steps: i / (n as f32),
+                    steps: i,
+                    total: n as i32,
+                    number_of_duplicates: min_indices
+                        .iter()
+                        .filter_map(|val| val.as_ref().map(|a| a.len()))
+                        .reduce(|a, b| a + b)
+                        .unwrap() as i32,
                 });
             }
             Some(singleton_index) => {
@@ -355,13 +414,15 @@ pub fn type_0_permutation(
                     .any(|s| s.as_ref().map_or(false, |a| a.is_empty()))
                 {
                     return Err(PermutationCloseness {
-                        steps: i / (n as f32),
+                        steps: i,
+                        total: n as i32,
+                        number_of_duplicates: 0,
                     });
                 }
             }
         }
 
-        i += 1 as f32;
+        i += 1;
     }
 
     let result: Vec<usize> = result
@@ -498,10 +559,7 @@ pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationC
         vertlist: DirList,
         is_reversed: bool,
     ) -> Result<SearchRecord, PermutationCloseness> {
-        let mut best_closeness_record = PermutationCloseness {
-            steps: 0.0,
-        };
-
+        let mut best_closeness_record = None;
         let matrix = w_matrix(vertlist.clone());
         let rowsum = matrix
             .clone()
@@ -531,7 +589,7 @@ pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationC
                     });
                 }
                 Err(c) => {
-                    best_closeness_record = c;
+                    best_closeness_record = best_closeness_record.max(Some(c));
                 }
             }
         }
@@ -553,16 +611,12 @@ pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationC
                     });
                 }
                 Err(c) => {
-                    best_closeness_record = if c.steps > best_closeness_record.steps {
-                        c
-                    } else {
-                        best_closeness_record
-                    };
+                    best_closeness_record = best_closeness_record.max(Some(c));
                 }
             }
         }
 
-        Err(best_closeness_record)
+        Err(best_closeness_record.unwrap())
     }
 
     match try_instance_permutations(vertlist.clone(), false) {

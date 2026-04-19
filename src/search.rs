@@ -1,6 +1,9 @@
+use colored::Colorize;
+use plotters::style::IntoTextStyle;
+use std::cmp::Reverse;
 use std::{
     cmp::min,
-    collections::HashSet,
+    collections::{BinaryHeap, HashMap, HashSet},
     io::{self, Write},
 };
 
@@ -9,7 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     LoggingType,
-    knot_core::{DirList, Permutation, WindingMatrix, try_permutations},
+    knot_core::{
+        DirList, Permutation, PermutationCloseness, TaggedDirList, WindingMatrix, try_permutations,
+    },
     knot_finder_grammer::KnotFinder,
 };
 
@@ -36,47 +41,88 @@ pub struct KnotResult {
 }
 
 pub fn manual_gridstate_finder(
-    vertlists: HashSet<DirList>,
+    vertlists: DirList,
     logging: &LoggingType,
     mut knot_finder: KnotFinder,
 ) -> Result<SearchRecord, SearchFailure> {
+    let vertlists = BinaryHeap::from([TaggedDirList::tag(vertlists)]);
+
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::SingleLine);
 
-    let mut previous_frontier_size = vertlists.len();
+    let mut previous_frontier_size;
     let mut current_states = vertlists;
-    let mut visited_states = current_states.clone();
+    let mut visited_states: HashSet<DirList> = HashSet::new();
     let mut i = 0;
 
+    // TODO: add deduplicate
     while let Some((knot_finding_function, move_name, dedup)) = knot_finder.next() {
         previous_frontier_size = current_states.len();
 
-        if let Some(record) = current_states
+        let perm_results = current_states
             .par_iter()
-            .filter_map(|a| try_permutations(a).ok())
-            .find_any(|_| true)
-        {
+            .map(|tagged_list| try_permutations(&tagged_list.dirlist));
+
+        if let Some(record) = perm_results.filter_map(|a| a.ok()).find_any(|_| true) {
             return Ok(record);
         }
-
-        if dedup {
-            current_states = current_states
-                .par_iter()
-                .flat_map(|r| knot_finding_function(&r))
-                .filter(|a| !current_states.contains(a) && !visited_states.contains(a))
-                .collect::<HashSet<_>>();
-
-            if current_states.is_empty() {
-                return Err(SearchFailure::ExhaustedSearchSpace);
-            }
-
-            visited_states.extend(current_states.clone());
+        // let best = if let Some(current) = current_states.pop() {
+        let best = if let Some(current) = current_states.pop() {
+            current
         } else {
-            current_states = current_states
-                .par_iter()
-                .flat_map(|r| knot_finding_function(&r))
-                .collect::<HashSet<_>>();
+            return Err(SearchFailure::ExhaustedSearchSpace);
+        };
+
+        let next_states = knot_finding_function(&best.dirlist)
+            .into_iter()
+            .map(|a| try_permutations(&a).map_err(|b| TaggedDirList::new(a, Some(b))));
+
+        // print!("best: {:?}", best.closeness.map(|a| a.steps));
+        // // print!("best:\n {}", best.dirlist);
+
+        // for item in next_states.clone().filter_map(|a| {
+        //     a.err().map(|a| {
+        //         let s = a.closeness.unwrap().steps;
+        //         s.to_string().on_truecolor((s * 14) as u8, 0, (s * 14) as u8)
+        //     })
+        // }) {
+        //     print!(" {} ", item);
+        // }
+
+        // println!();
+
+        if let Some(record) = next_states.clone().filter_map(|a| a.ok()).next() {
+            return Ok(record);
         }
+        current_states.extend(
+            next_states
+                .filter_map(|a| a.err())
+                .filter(|a| !visited_states.contains(&a.dirlist))
+                .collect::<Vec<_>>(),
+        );
+
+        visited_states.insert(best.dirlist.clone());
+
+        // current_states.extend(next_states);
+
+        // if dedup {
+        //     current_states = current_states
+        //         .par_iter()
+        //         .flat_map(|(r)| knot_finding_function(&r))
+        //         .filter(|a| !current_states.contains(a) && !visited_states.contains(a))
+        //         .collect::<HashSet<_>>();
+
+        //     if current_states.is_empty() {
+        //         return Err(SearchFailure::ExhaustedSearchSpace);
+        //     }
+
+        //     visited_states.extend(current_states.clone());
+        // } else {
+        //     current_states = current_states
+        //         .par_iter()
+        //         .flat_map(|r| knot_finding_function(&r))
+        //         .collect::<HashSet<_>>();
+        // }
         i += 1;
 
         if do_logging {
@@ -86,21 +132,30 @@ pub fn manual_gridstate_finder(
                 previous_frontier_size,
                 single_line,
                 &move_name,
-                dedup
+                dedup,
+                current_states.peek().unwrap(),
             );
         }
     }
+
+    let best = if let Some(current) = current_states.pop() {
+        current
+    } else {
+        return Err(SearchFailure::ExhaustedSearchSpace);
+    };
+    println!("{}", best.dirlist);
 
     Err(SearchFailure::HitDepthLimit)
 }
 
 fn gridstate_log(
-    current_states: &HashSet<DirList>,
+    current_states: &BinaryHeap<TaggedDirList>,
     iteration: i32,
     previous_states_len: usize,
     single_line: bool,
     move_name: &str,
     dedup: bool,
+    best: &TaggedDirList,
 ) {
     print!("{:<5}  ", iteration);
     print!("Size of the frontier: {:<10}", current_states.len());
@@ -112,7 +167,16 @@ fn gridstate_log(
         "-".repeat(30 - format_blocks)
     );
     print!("Ratio change: {:.2}%", 100.0 * ratio);
-    print!("    {} {}", move_name, if dedup { "de-duplicate" } else { "preserve-all" });
+    print!(
+        "    {} {}",
+        move_name,
+        if dedup {
+            "de-duplicate"
+        } else {
+            "preserve-all"
+        }
+    );
+    print!("    {:?}", best.closeness);
 
     if single_line {
         print!("\r");
