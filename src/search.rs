@@ -64,6 +64,27 @@ pub fn manual_gridstate_finder(
             .map(|tagged_list| try_permutations(&tagged_list.dirlist));
 
         if let Some(record) = perm_results.filter_map(|a| a.ok()).find_any(|_| true) {
+            let best = &record.vlist;
+
+            let next_states = knot_finding_function(&best)
+                .into_iter()
+                .map(|a| try_permutations(&a).map_err(|b| TaggedDirList::new(a, Some(b))));
+            println!("Found:");
+
+            for item in next_states.clone().map(|a| {
+                a.err().map(|a| {
+                    let s = a.closeness.unwrap().steps;
+                    s.to_string().on_truecolor((s * 17) as u8, 0, (s * 17) as u8)
+                })
+            }) {
+                match item {
+                    Some(item) => print!(" {} ", item),
+                    None => print!(" {} ", "!".on_yellow().black()),
+                }
+            }
+
+            println!();
+
             return Ok(record);
         }
         // let best = if let Some(current) = current_states.pop() {
@@ -77,19 +98,22 @@ pub fn manual_gridstate_finder(
             .into_iter()
             .map(|a| try_permutations(&a).map_err(|b| TaggedDirList::new(a, Some(b))));
 
-        // print!("best: {:?}", best.closeness.map(|a| a.steps));
-        // // print!("best:\n {}", best.dirlist);
+        print!("best: {:?}", best.closeness.map(|a| a.steps));
+        // print!("best:\n {}", best.dirlist);
 
-        // for item in next_states.clone().filter_map(|a| {
-        //     a.err().map(|a| {
-        //         let s = a.closeness.unwrap().steps;
-        //         s.to_string().on_truecolor((s * 14) as u8, 0, (s * 14) as u8)
-        //     })
-        // }) {
-        //     print!(" {} ", item);
-        // }
+        for item in next_states.clone().map(|a| {
+            a.err().map(|a| {
+                let s = a.closeness.unwrap().steps;
+                s.to_string().on_truecolor((s * 17) as u8, 0, (s * 17) as u8)
+            })
+        }) {
+            match item {
+                Some(item) => print!(" {} ", item),
+                None => print!(" {} ", "!".on_yellow().black()),
+            }
+        }
 
-        // println!();
+        println!();
 
         if let Some(record) = next_states.clone().filter_map(|a| a.ok()).next() {
             return Ok(record);
