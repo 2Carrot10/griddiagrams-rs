@@ -1,6 +1,7 @@
 use crate::knot_core::{DirList, h_to_v, v_to_h};
 use std::cmp::max;
 use std::cmp::min;
+use std::collections::HashSet;
 
 pub enum StabDir {
     NorthWest,
@@ -43,9 +44,9 @@ impl StabDir {
 pub fn adj_elementwise_move_on_predicate(
     input_list: &DirList,
     preciate: impl Fn((i32, i32), (i32, i32)) -> bool,
-) -> Vec<DirList> {
-    let mut result = vec![];
-    let mut seen = vec![];
+) -> HashSet<DirList> {
+    let mut result = HashSet::new();
+    let mut seen = HashSet::new();
 
     let n = input_list.0.len();
 
@@ -58,8 +59,8 @@ pub fn adj_elementwise_move_on_predicate(
             swapped_list.0[i + 1] = b;
 
             if !seen.contains(&swapped_list.0) {
-                seen.push(swapped_list.0.clone());
-                result.push(swapped_list.clone());
+                seen.insert(swapped_list.0.clone());
+                result.insert(swapped_list.clone());
             }
         }
     }
@@ -75,8 +76,8 @@ pub fn adj_elementwise_move_on_predicate(
         swapped_list.0[index] = b;
 
         if !seen.contains(&swapped_list.0) {
-            seen.push(swapped_list.0.clone());
-            result.push(swapped_list.clone());
+            seen.insert(swapped_list.0.clone());
+            result.insert(swapped_list.clone());
         }
     }
     result
@@ -85,10 +86,10 @@ pub fn adj_elementwise_move_on_predicate(
 pub fn knot_column_and_row_predicate_move(
     vertlist: &DirList,
     predicate: impl Fn((i32, i32), (i32, i32)) -> bool + 'static,
-) -> Vec<DirList> {
+) -> HashSet<DirList> {
     let v_list = adj_elementwise_move_on_predicate(vertlist, &predicate);
     let h_list = adj_elementwise_move_on_predicate(&v_to_h(vertlist), &predicate); // Bad clone
-    let mut h_to_v_commutations: Vec<DirList> =
+    let mut h_to_v_commutations: HashSet<DirList> =
         h_list.into_iter().map(|a| h_to_v(&a)).collect();
 
     h_to_v_commutations.extend(v_list);
@@ -97,20 +98,20 @@ pub fn knot_column_and_row_predicate_move(
 }
 
 // All of these can contain duplicates
-pub fn knot_switch(vertlist: &DirList) -> Vec<DirList> {
+pub fn knot_switch(vertlist: &DirList) -> HashSet<DirList> {
     knot_column_and_row_predicate_move(vertlist, can_switch)
 }
 
-pub fn knot_commute(vertlist: &DirList) -> Vec<DirList> {
+pub fn knot_commute(vertlist: &DirList) -> HashSet<DirList> {
     knot_column_and_row_predicate_move(vertlist, can_commute)
 }
 
 
-pub fn knot_epsilon(vertlist: &DirList) -> Vec<DirList> {
-    vec![vertlist.clone()]
+pub fn knot_epsilon(vertlist: &DirList) -> HashSet<DirList> {
+    HashSet::from([vertlist.clone()])
 }
 
-pub fn knot_stab(input_list: &DirList) -> Vec<DirList> {
+pub fn knot_stab(input_list: &DirList) -> HashSet<DirList> {
     let mut grid_stab_combos = vec![];
     for segment in input_list.0.clone() {
         for (index, dir) in STAB_COMBINATIONS {
@@ -146,10 +147,10 @@ pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
     (a == d) || (c == b)
 }
 
-pub fn knot_destab(vertlist: &DirList) -> Vec<DirList> {
+pub fn knot_destab(vertlist: &DirList) -> HashSet<DirList> {
     let v_commutations = destab_move(vertlist);
     let h_commutations = destab_move(&v_to_h(vertlist));
-    let mut h_to_v_commutations: Vec<DirList> =
+    let mut h_to_v_commutations: HashSet<DirList> =
         h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
 
     h_to_v_commutations.extend(v_commutations);
@@ -157,8 +158,8 @@ pub fn knot_destab(vertlist: &DirList) -> Vec<DirList> {
     h_to_v_commutations
 }
 
-fn destab_move(vertlist: &DirList) -> Vec<DirList> {
-    let mut result = vec![];
+fn destab_move(vertlist: &DirList) -> HashSet<DirList> {
+    let mut result = HashSet::new();
 
     let n = vertlist.0.len();
 
@@ -179,7 +180,7 @@ fn destab_move(vertlist: &DirList) -> Vec<DirList> {
             }
 
             if !result.contains(&swapped_list) {
-                result.push(swapped_list.clone());
+                result.insert(swapped_list.clone());
             }
         }
     }

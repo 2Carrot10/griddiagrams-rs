@@ -18,8 +18,8 @@ use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    knot_core::{DirList, is_valid},
-    search::{KnotResult, SearchFailure, manual_gridstate_finder},
+    knot_core::{is_valid, DirList},
+    search::{gridstate_finder, heuristic_gridstate_finder, KnotResult, SearchFailure},
 };
 
 use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_search};
@@ -188,7 +188,7 @@ fn main() {
             }
         }
 
-        let mut search_record = manual_gridstate_finder(
+        let mut search_record = gridstate_finder(
            vertlist,
             &logging_type,
             knot_finder.clone(),

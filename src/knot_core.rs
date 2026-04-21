@@ -1,9 +1,9 @@
+use rand::Rng;
 use std::cmp::Ordering;
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::iter;
-use rand::Rng; // 0.8.5
+use std::iter; // 0.8.5
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -86,11 +86,10 @@ pub struct PermutationCloseness {
 impl Ord for PermutationCloseness {
     fn cmp(&self, other: &Self) -> Ordering {
         let other_ratio = self.steps / self.total;
-        let this_ratio  = other.steps / other.total;
+        let this_ratio = other.steps / other.total;
         match this_ratio.cmp(&other_ratio) {
             Ordering::Equal => self.number_of_duplicates.cmp(&other.number_of_duplicates),
-            other => other
-            // base => base,
+            other => other, // base => base,
         }
     }
 }
@@ -409,6 +408,7 @@ pub fn type_0_permutation(
 
                 min_indices[singleton_index] = None;
 
+                /*
                 if min_indices
                     .iter()
                     .any(|s| s.as_ref().map_or(false, |a| a.is_empty()))
@@ -418,7 +418,7 @@ pub fn type_0_permutation(
                         total: n as i32,
                         number_of_duplicates: 0,
                     });
-                }
+                }*/
             }
         }
 
@@ -710,6 +710,60 @@ impl Display for DirList {
             println!();
         }
         std::fmt::Result::Ok(())
+    }
+}
+
+pub fn diagram_and_state(dirlist: &DirList, state: &Permutation) {
+    let horzlist = v_to_h(dirlist);
+    let mut downward_lines = vec![false; dirlist.0.len()];
+    // for ((x, o), m) in horzlist.0.into_iter().zip(state) {
+    for ind2 in 0..(horzlist.0.len() * 2) {
+        for i2 in 0..((dirlist.0.len() as i32) * 2) {
+            let vert_aligned = ind2 % 2 == 0;
+            let horz_aligned = i2 % 2 == 1;
+            let i = i2/2;
+            let index = ind2/2;
+            if vert_aligned || horz_aligned {
+                let (x, o) = horzlist.0[index];
+                if vert_aligned && horz_aligned && (i == min(x, o)) {
+                    print!(
+                        "{}",
+                        if downward_lines[min(x, o) as usize] {
+                            "╰"
+                        } else {
+                            "╭"
+                        }
+                    );
+                    downward_lines[i as usize] = !downward_lines[i as usize];
+                } else if vert_aligned && horz_aligned && i == max(x, o) {
+                    print!(
+                        "{}",
+                        if downward_lines[max(x, o) as usize] {
+                            "╯"
+                        } else {
+                            "╮"
+                        }
+                    );
+                    downward_lines[i as usize] = !downward_lines[i as usize];
+                } else {
+                    if horz_aligned && downward_lines[i as usize] {
+                        print!("│");
+                    } else if vert_aligned && min(x, o) < i && (i - 1) < max(x, o) {
+                        print!("─");
+                    } else {
+                        print!(" ");
+                    }
+
+                }
+            } else {
+                if state[i as usize] == index {
+                    print!(" ⃝");
+                } else {
+                    print!("·");
+                }
+            }
+        }
+        println!();
     }
 }
 

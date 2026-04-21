@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use std::{collections::HashSet, iter::Peekable};
 
 use crate::{
     knot_core::DirList,
@@ -7,8 +7,8 @@ use crate::{
 
 use regex::Regex;
 
-type MoveFunction = fn(&DirList) -> Vec<DirList>;
-type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<DirList> + Sync>;
+type MoveFunction = fn(&DirList) -> HashSet<DirList>;
+type DynamicMoveFunction = Box<dyn Fn(&DirList) -> HashSet<DirList> + Sync>;
 
 trait AlgorithmGrammar {
     fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)>;
@@ -88,7 +88,7 @@ impl AlgorithmGrammar for UnionSearchType {
 
         Some((
             Box::new(move |input: &DirList| {
-                let mut out = Vec::new();
+                let mut out = HashSet::new();
                 for (fun, _) in &contains {
                     out.extend(fun(input));
                 }
@@ -183,7 +183,7 @@ impl KnotFinder {
 
     pub fn build_search_type(
         depth: i32,
-        function: fn(&DirList) -> Vec<DirList>,
+        function: fn(&DirList) -> HashSet<DirList>,
         name: String,
     ) -> KnotFinder {
         KnotFinder(SearchType::Repeat(RepeatSearchType {
