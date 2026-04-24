@@ -188,7 +188,7 @@ fn main() {
             }
         }
 
-        let mut search_record = gridstate_finder(
+        let mut search_record = heuristic_gridstate_finder(
            vertlist,
             &logging_type,
             knot_finder.clone(),

@@ -349,10 +349,6 @@ pub fn type_0_permutation(
     };
 
     let n = matrix.len();
-    let type_string = match direction {
-        Dir::Horz => "h-type-0",
-        Dir::Vert => "v-type-0",
-    };
 
     let mut min_indices: Vec<Option<HashSet<usize>>> = matrix
         .into_iter()
@@ -408,17 +404,16 @@ pub fn type_0_permutation(
 
                 min_indices[singleton_index] = None;
 
-                /*
                 if min_indices
                     .iter()
                     .any(|s| s.as_ref().map_or(false, |a| a.is_empty()))
                 {
                     return Err(PermutationCloseness {
-                        steps: i,
+                        steps: i + 100,
                         total: n as i32,
                         number_of_duplicates: 0,
                     });
-                }*/
+                }
             }
         }
 

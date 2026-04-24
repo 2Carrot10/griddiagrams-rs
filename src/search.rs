@@ -75,9 +75,9 @@ pub fn heuristic_gridstate_finder(
             .into_iter()
             .map(|a| try_permutations(&a).map_err(|b| TaggedDirList::new(a, Some(b)))).collect();
 
-        if let Some(a) = best.closeness {
-            print!("best:\n {:?}", a.steps);
-        }
+        // if let Some(a) = best.closeness {
+        //     print!("best:\n {:?}", a.steps);
+        // }
 
         for item in next_states.iter().map(|a| {
             a.as_ref().err().map(|a| {
