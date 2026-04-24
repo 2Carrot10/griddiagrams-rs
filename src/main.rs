@@ -392,11 +392,11 @@ fn save_results_verbose(file_name: String, results: &Vec<KnotResult>) {
             KnotResult {
                 search_record: Err(SearchFailure::HitDepthLimit),
                 knot: _,
-            } => serde_json::from_str("depth error").unwrap(),
+            } => serde_json::from_str("\"depth error\"").unwrap(),
             KnotResult {
                 search_record: Err(SearchFailure::ExhaustedSearchSpace),
                 knot: _,
-            } => serde_json::from_str("space exhausted error").unwrap(),
+            } => serde_json::from_str("\"space exhausted error\"").unwrap(),
         }
         );
     }
