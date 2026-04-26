@@ -2,7 +2,7 @@ use regex::Regex;
 
 use crate::knot_core::DirList;
 
-fn string_to_vertmap(text: String) -> DirList {
+pub fn string_to_vertmap(text: String) -> DirList {
     let mut out: DirList = DirList(vec![]);
 
     let re = Regex::new(
