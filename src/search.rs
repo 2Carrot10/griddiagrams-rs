@@ -41,7 +41,7 @@ pub fn manual_gridstate_finder(
     mut knot_finder: KnotFinder,
 ) -> Result<SearchRecord, SearchFailure> {
     let do_logging = !matches!(logging, LoggingType::None);
-    let single_line = matches!(logging, LoggingType::SingleLine);
+    let single_line = matches!(logging, LoggingType::Single);
 
     let mut previous_frontier_size = vertlists.len();
     let mut current_states = vertlists;

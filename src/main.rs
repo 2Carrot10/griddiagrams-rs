@@ -4,7 +4,6 @@ mod knot_core;
 mod knot_finder_grammer;
 mod reidemiester;
 mod search;
-mod vis;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -30,63 +29,59 @@ const UNSOLVED_KNOT_NAMES: [&str; 12] = [
 ];
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(version, about, long_about = None)]
+#[command(version)]
+#[command(about = "A tool for quickly finding nice fibered knots")]
+// #[command(long_about = "This program demonstrates using clap derive for a CLI with a longer description, \
+// including more details and instructions.")]
 struct Args {
-    #[arg(short, long)]
+    /// store record of search successes and failures in <file>
+    #[arg(short, long, value_name = "file")]
+
     output: Option<String>,
 
-    /// Only used optionally in combination with the  `--knots rest`. If this value is undefined,
-    /// `--knots rest` will refer to the output file if it already exists, mutating it in the
-    /// process.
-    #[arg(short, long)]
+    /// search knots using failures in <file>; can only be used in combination with `--knots rest`
+    #[arg(short, long, value_name = "file")]
     input: Option<String>,
 
-    /// TODO: unimplemented
-    /// The file to use in place of command flags. Used to avoid repeatedly writing out long commands.
-    #[arg(short, long)]
-    config: Option<String>,
-
-    /// Which knots to target. Value must be "all", "unsolved", knot name separated by commas
-    /// (e.g. 12n_79, 12n_168, 13n_282, 13n_917), a range "<start> - <end>", a percentage of
-    /// the dataset to use "<percent>%", "rest" representing the knots of the output which have
-    /// not yet been solved, or a vertlist in the format [(1,0), (0,1)].
+    /// which knots to target ("all", "unsolved", comma separated knot names "<start index> - <end
+    /// index>", "rest" (in combination with --input), or a vertlist in the format [(1,0), (0,1)].
     #[arg(short, long, default_value_t = String::from("unsolved"))]
     knots: String,
 
-    /// Options: stab, commute
+    /// which algorithm to use ("stabilize", "commute", or a path to an algorithm file)
     #[arg(short, long, default_value_t = String::from("stab"))]
     algorithm: String,
 
-    /// Options: none, single, multi
+    /// how to format lines of logging when searching for a solution for a knot (none, single, multi)
     #[arg(long, default_value_t = String::from("single"))]
     logging: String,
 
-    /// Options: positives, negative, both, neither
+    /// which results to display (positives, negatives, both, neither)
     #[arg(long, default_value_t = String::from("both"))]
     result_type: String,
 
-    /// Hide analytics at the end.
     #[arg(long)]
     hide_analytics: bool,
 
-    /// Number of times to greet
     #[arg(short = 'n', long, default_value_t = 200)]
     depth: i32,
 
+    /// Will default to the number of cores available on the system
     #[arg(short, long)]
     threads: Option<i32>,
 
     #[arg(long)]
     hide_diagrams: bool,
 
+    /// store nice diagram instead of just weather or not it exists
     #[arg(long)]
     verbose_output: bool,
 }
 
 pub enum LoggingType {
     None,
-    SingleLine,
-    MultiLine,
+    Single,
+    Multiline,
 }
 
 fn main() {
@@ -94,8 +89,8 @@ fn main() {
     let csv = load_knot_data();
     let logging_type = match args.logging.as_str() {
         "none" => LoggingType::None,
-        "multi" => LoggingType::MultiLine,
-        "single" => LoggingType::SingleLine,
+        "multi" => LoggingType::Multiline,
+        "single" => LoggingType::Single,
         _ => panic!("Could not read logging type"),
     };
     let (log_positives, log_negatives) = match args.result_type.as_str() {
@@ -126,19 +121,6 @@ fn main() {
         .into_iter()
         .map(|name| (get_vlist_by_name(&name, &csv), name))
         .collect(),
-        string
-            if let Some(parsed_num) = string
-                .strip_suffix("%")
-                .map(|a| a.parse::<i32>().ok())
-                .flatten() =>
-        {
-            let knots = get_all_knot_names(&csv);
-            knots[..(knots.len() * (parsed_num / 100) as usize)]
-                .to_vec()
-                .into_iter()
-                .map(|name| (get_vlist_by_name(&name, &csv), name))
-                .collect()
-        }
         string
             if let Some((Some(start), Some(end))) = string
                 .split_once("-")
@@ -194,7 +176,7 @@ fn main() {
             &logging_type,
             knot_finder.clone(),
         );
-        if matches!(logging_type, LoggingType::SingleLine) {
+        if matches!(logging_type, LoggingType::Single) {
             println!();
         }
 
