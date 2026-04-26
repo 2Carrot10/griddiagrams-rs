@@ -4,6 +4,8 @@ mod knot_core;
 mod knot_finder_grammer;
 mod reidemiester;
 mod search;
+mod display;
+mod vertlist;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -11,22 +13,15 @@ use std::{
 };
 
 use clap::Parser;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    knot_core::{DirList, is_valid},
     search::{KnotResult, SearchFailure, manual_gridstate_finder},
 };
 
 use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_search};
-
-const UNSOLVED_KNOT_NAMES: [&str; 12] = [
-    "12n_79", "12n_168", "13n_282", "13n_917", "13n_1279", "13n_1281", "13n_1413", "13n_1826",
-    "13n_2915", "13n_3089", "13n_3904", "13n_3932",
-];
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(version)]
@@ -43,9 +38,9 @@ struct Args {
     #[arg(short, long, value_name = "file")]
     input: Option<String>,
 
-    /// which knots to target ("all", "unsolved", comma separated knot names "<start index> - <end
+    /// which knots to target ("all", comma separated knot names "<start index> - <end
     /// index>", "rest" (in combination with --input), or a vertlist in the format [(1,0), (0,1)].
-    #[arg(short, long, default_value_t = String::from("unsolved"))]
+    #[arg(short, long, default_value_t = String::from("all"))]
     knots: String,
 
     /// which algorithm to use ("stabilize", "commute", or a path to an algorithm file)
@@ -102,11 +97,6 @@ fn main() {
     };
 
     let knot_list: Vec<_> = match args.knots.as_str() {
-        "unsolved" => UNSOLVED_KNOT_NAMES
-            .to_vec()
-            .into_iter()
-            .map(|a| (get_vlist_by_name(&a.to_string(), &csv), a.to_string()))
-            .collect(),
         "all" => get_all_knot_names(&csv)
             .into_iter()
             .map(|name| (get_vlist_by_name(&name, &csv), name))
@@ -315,45 +305,6 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
         .collect();
 
     return keys;
-}
-
-fn string_to_vertmap(text: String) -> DirList {
-    let mut out: DirList = DirList(vec![]);
-
-    let re = Regex::new(
-        r#"(?x)
-        \d+                             |
-        [[[:alpha:]]\_]+                |
-        '.+?'                           |
-        ".*"+?                          |
-        [=+*/%&|<>!?^~\#\-]+   |
-        [\(\)\[\]\{\}.\:;,@]|
-        \p{Letter}
-        "#,
-    )
-    .unwrap();
-
-    let mut tokens = re
-        .find_iter(&text)
-        .map(|capture| capture.as_str().to_string())
-        .collect::<Vec<_>>()
-        .into_iter()
-        .peekable();
-
-    assert_eq!(tokens.next().as_deref(), Some("["));
-    while tokens.peek().map(|s| s.as_str()) != Some("]") {
-        assert_eq!(tokens.next().as_deref(), Some("("));
-        let x = tokens.next().unwrap().parse::<i32>().unwrap();
-        assert_eq!(tokens.next().as_deref(), Some(","));
-        let o = tokens.next().unwrap().parse::<i32>().unwrap();
-        assert_eq!(tokens.next().as_deref(), Some(")"));
-        if tokens.peek().map(|s| s.as_str()) != Some("]") {
-            assert_eq!(tokens.next().as_deref(), Some(","));
-        }
-        out.0.push((x, o));
-    }
-    assert!(is_valid(&out), "Diagram is not a valid knot");
-    out
 }
 
 #[allow(dead_code)]

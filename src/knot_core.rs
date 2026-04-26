@@ -1,7 +1,4 @@
-use std::cmp::{max, min};
 use std::collections::HashSet;
-use std::fmt::Display;
-use std::iter;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -73,10 +70,6 @@ pub enum Dir {
 
 pub type Permutation = Vec<usize>;
 pub type WindingMatrix = Vec<Vec<i32>>;
-#[derive(PartialOrd, PartialEq)]
-pub struct PermutationCloseness {
-    steps: f32, // percentage of steps that are correct
-}
 
 pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
     if gridnotation.len() == 0 {
@@ -286,10 +279,7 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
 // -------
 // List[int] or str
 //     Permutation if unique one exists, error message otherwise.
-pub fn type_0_permutation(
-    matrix: WindingMatrix,
-    direction: Dir,
-) -> Result<Permutation, PermutationCloseness> {
+pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Option<Permutation> {
     let matrix = if let Dir::Vert = direction {
         transpose(matrix)
     } else {
@@ -326,9 +316,7 @@ pub fn type_0_permutation(
 
         match singleton_index {
             None => {
-                return Err(PermutationCloseness {
-                    steps: i / (n as f32),
-                });
+                return None;
             }
             Some(singleton_index) => {
                 // X is the first element in the singleton set
@@ -354,9 +342,7 @@ pub fn type_0_permutation(
                     .iter()
                     .any(|s| s.as_ref().map_or(false, |a| a.is_empty()))
                 {
-                    return Err(PermutationCloseness {
-                        steps: i / (n as f32),
-                    });
+                    return None;
                 }
             }
         }
@@ -492,16 +478,9 @@ pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
 /// -----
 /// This function tries both the original and reversed orientation,
 /// checking for both horizontal and vertical perfect grid states.
-pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationCloseness> {
+pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
     // try_instance_permutations Does not attempt reversed
-    fn try_instance_permutations(
-        vertlist: DirList,
-        is_reversed: bool,
-    ) -> Result<SearchRecord, PermutationCloseness> {
-        let mut best_closeness_record = PermutationCloseness {
-            steps: 0.0,
-        };
-
+    fn try_instance_permutations(vertlist: DirList, is_reversed: bool) -> Option<SearchRecord> {
         let matrix = w_matrix(vertlist.clone());
         let rowsum = matrix
             .clone()
@@ -530,9 +509,6 @@ pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationC
                         },
                     });
                 }
-                Err(c) => {
-                    best_closeness_record = c;
-                }
             }
         }
 
@@ -552,31 +528,17 @@ pub fn try_permutations(vertlist: &DirList) -> Result<SearchRecord, PermutationC
                         },
                     });
                 }
-                Err(c) => {
-                    best_closeness_record = if c.steps > best_closeness_record.steps {
-                        c
-                    } else {
-                        best_closeness_record
-                    };
-                }
             }
         }
-
-        Err(best_closeness_record)
+        None
     }
 
-    match try_instance_permutations(vertlist.clone(), false) {
-        Ok(p) => Ok(p),
-        Err(err) => match try_instance_permutations(rev(vertlist.clone()), true) {
-            Ok(p) => Ok(p),
-            Err(err2) => {
-                if err.steps > err2.steps {
-                    Err(err)
-                } else {
-                    Err(err2)
-                }
-            }
-        },
+    if let Some(solution) = try_instance_permutations(vertlist.clone(), false) {
+        solution
+    } else if let Some(solution) = try_instance_permutations(rev(vertlist.clone()), true) {
+        solution
+    } else {
+        None
     }
 }
 
@@ -615,68 +577,4 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
     let o = tempo.iter().map(|x| n - x).collect();
 
     return (x, o);
-}
-
-impl Display for DirList {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let horzlist = v_to_h(self);
-        let mut downward_lines = vec![false; self.0.len()];
-        for (x, o) in horzlist.0 {
-            for i in 0..(self.0.len() as i32) {
-                if i == min(x, o) {
-                    print!(
-                        "{}",
-                        if downward_lines[min(x, o) as usize] {
-                            "╰"
-                        } else {
-                            "╭"
-                        }
-                    );
-                    downward_lines[i as usize] = !downward_lines[i as usize];
-                } else if i == max(x, o) {
-                    print!(
-                        "{}",
-                        if downward_lines[max(x, o) as usize] {
-                            "╯"
-                        } else {
-                            "╮"
-                        }
-                    );
-                    downward_lines[i as usize] = !downward_lines[i as usize];
-                } else {
-                    if downward_lines[i as usize] {
-                        print!("│");
-                    } else if min(x, o) < i && i < max(x, o) {
-                        print!("─");
-                    } else {
-                        print!("·");
-                    }
-                }
-            }
-            println!();
-        }
-        std::fmt::Result::Ok(())
-    }
-}
-
-impl std::fmt::Debug for DirList {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let horzlist = v_to_h(self);
-        let hlen = horzlist.0.len();
-        for (x, o) in &horzlist.0 {
-            print!("{}", ".".repeat(*min(x, o) as usize));
-            print!("{}", if x < o { "○" } else { "✗" });
-            print!("{}", "·".repeat(((x - o).abs() - 1) as usize));
-            print!("{}", if x < o { "✗" } else { "○" });
-            print!(
-                "{}",
-                iter::repeat("·")
-                    .take(hlen - (max(x, o) - 1) as usize)
-                    .collect::<String>()
-            );
-            println!();
-        }
-
-        std::fmt::Result::Ok(())
-    }
 }

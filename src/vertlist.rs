@@ -1,0 +1,45 @@
+use regex::Regex;
+
+use crate::knot_core::DirList;
+
+fn string_to_vertmap(text: String) -> DirList {
+    let mut out: DirList = DirList(vec![]);
+
+    let re = Regex::new(
+        r#"(?x)
+        \d+                             |
+        [[[:alpha:]]\_]+                |
+        '.+?'                           |
+        ".*"+?                          |
+        [=+*/%&|<>!?^~\#\-]+   |
+        [\(\)\[\]\{\}.\:;,@]|
+        \p{Letter}
+        "#,
+    )
+    .unwrap();
+
+    let mut tokens = re
+        .find_iter(&text)
+        .map(|capture| capture.as_str().to_string())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .peekable();
+
+    assert_eq!(tokens.next().as_deref(), Some("["));
+    while tokens.peek().map(|s| s.as_str()) != Some("]") {
+        assert_eq!(tokens.next().as_deref(), Some("("));
+        let x = tokens.next().unwrap().parse::<i32>().unwrap();
+        assert_eq!(tokens.next().as_deref(), Some(","));
+        let o = tokens.next().unwrap().parse::<i32>().unwrap();
+        assert_eq!(tokens.next().as_deref(), Some(")"));
+        if tokens.peek().map(|s| s.as_str()) != Some("]") {
+            assert_eq!(tokens.next().as_deref(), Some(","));
+        }
+        out.0.push((x, o));
+    }
+    assert!(
+        crate::knot_core::is_valid(&out),
+        "Diagram is not a valid knot"
+    );
+    out
+}
