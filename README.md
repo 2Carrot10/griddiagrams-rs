@@ -69,9 +69,73 @@ For instance, this algorithm will do the following four times:
 # Example
 To search 12n_79 (the first previously unsolved knot) using the algorithm found at `algorithms/commute-or-stab`, outputing to `output/out.json` with a large amount of logging:
 ```sh
-./griddiagrams -knots 12n_79 -algorithm algorithms/commute-or-stab --logging multi --verbose-output -o output/out.json 
+./griddiagrams --knots 12n_79 --algorithm algorithms/commute-or-stab --logging multi --verbose-output -o output/out.json 
+```
+This command results in the following (abridged) output:
+```
+----
+# 0: 12n_79
+····╭──────╮
+··╭─│─────╮│
+··│·│····╭│╯
+··│·│···╭│╯·
+··│·│··╭│╯··
+··│·│·╭│╯···
+╭─│─│╮││····
+│·│╭│││╯····
+│╭││││╯·····
+╰│││╯│······
+·│╰│─╯······
+·╰─╯········
+
+1      Size of the frontier: 96          [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒]  Ratio change: 9600.00%    stab de-duplicate
+2      Size of the frontier: 410         [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒]  Ratio change: 427.08%    commute de-duplicate
+3      Size of the frontier: 1283        [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒]  Ratio change: 312.93%    commute de-duplicate
+4      Size of the frontier: 3095        [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒------]  Ratio change: 241.23%    commute de-duplicate
+5      Size of the frontier: 6680        [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒---------]  Ratio change: 215.83%    commute de-duplicate
+6      Size of the frontier: 12802       [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒-----------]  Ratio change: 191.65%    commute de-duplicate
+<iterations abridged for brevity>
+18     Size of the frontier: 2479379     [▒▒▒▒▒▒▒▒▒▒▒▒▒▒----------------]  Ratio change: 143.62%    commute de-duplicate
+19     Size of the frontier: 3522691     [▒▒▒▒▒▒▒▒▒▒▒▒▒▒----------------]  Ratio change: 142.08%    commute de-duplicate
+20     Size of the frontier: 4953972     [▒▒▒▒▒▒▒▒▒▒▒▒▒▒----------------]  Ratio change: 140.63%    commute de-duplicate
+Found nice knot for 12n_79, #0: [(0, 2), (9, 4), (1, 8), (6, 12), (10, 0), (11, 9), (8, 5), (4, 10), (7, 3), (2, 6), (5, 7), (3, 11), (12, 1)]
+╭───╮········
+│·╭─│───────╮
+╰─│─│────╮··│
+··│·│···╭│─╮│
+·╭│─│──╮││·││
+·││·│·╭│││╮││
+·││╭│─│││╯│││
+·││││·││╰─╯││
+·│╰││─╯│···││
+·╰─││╮·│···││
+···│╰│─╯···││
+···│·╰─────╯│
+···╰────────╯
 ```
 To search all knots using just commutations, logging only weather or not they have succeeded:
 ```sh
-./griddiagrams -knots all -algorithm commute --logging none -o output/out.json 
+./griddiagrams --knots all --algorithm commute --logging none -o output/out.json 
+```
+This command results in the following (abridged) output
+```
+Found nice knot for 3_1, #0: [(2, 0), (3, 1), (4, 2), (0, 3), (1, 4)]
+Found nice knot for 4_1, #1: [(2, 0), (1, 3), (5, 2), (0, 4), (3, 5), (4, 1)]
+Found nice knot for 5_1, #2: [(2, 0), (3, 1), (4, 2), (5, 3), (6, 4), (0, 5), (1, 6)]
+Found nice knot for 8_19, #3: [(3, 0), (4, 1), (5, 2), (6, 3), (0, 4), (1, 5), (2, 6)]
+Found nice knot for 6_2, #4: [(2, 0), (3, 1), (4, 2), (6, 3), (5, 7), (0, 6), (7, 4), (1, 5)]
+Found nice knot for 6_3, #5: [(2, 0), (3, 1), (5, 2), (4, 7), (0, 6), (7, 3), (1, 5), (6, 4)]
+Found nice knot for 8_20, #6: [(3, 0), (4, 1), (2, 7), (5, 3), (0, 4), (1, 6), (7, 5), (6, 2)]
+Could not find nice knot for 8_21, #7 (search space error)
+Could not find nice knot for 9_42, #8 (search space error)
+<iterations abridged for brevity>
+Found nice knot for 13a_4844, #5394: [(11, 7), (9, 13), (6, 10), (8, 1), (12, 5), (7, 9), (10, 14), (4, 6), (13, 0), (5, 11), (14, 8), (3, 12), (2, 4), (1, 3), (0, 2)]
+Could not find nice knot for 13a_4847, #5395 (search space error)
+Found nice knot for 13a_4878, #5396: [(2, 0), (3, 1), (4, 2), (5, 3), (6, 4), (7, 5), (8, 6), (9, 7), (10, 8), (11, 9), (12, 10), (13, 11), (14, 12), (0, 13), (1, 14)]
+========= Analytics =========
+Total: 5397
+Positive results: 4346   80%
+Negative results: 1051   19%
+   Depth error: 15   0%
+   Frontier error: 1036   19%
 ```
