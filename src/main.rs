@@ -25,7 +25,7 @@ use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_searc
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(version)]
-#[command(about = "A tool for quickly finding nice fibered knots")]
+#[command(about = "A tool for quickly finding nice fibered knots, based on https://github.com/paulitzlinger/griddiagrams")]
 // #[command(long_about = "This program demonstrates using clap derive for a CLI with a longer description, \
 // including more details and instructions.")]
 struct Args {

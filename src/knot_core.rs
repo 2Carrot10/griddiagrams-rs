@@ -305,7 +305,6 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Option<Permu
         .collect();
     let mut result = vec![None; n];
 
-    let mut i = 0 as f32;
     while min_indices.iter().any(|s| s.is_some()) {
         let singleton_index = min_indices
             .iter()
@@ -346,8 +345,6 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Option<Permu
                 }
             }
         }
-
-        i += 1 as f32;
     }
 
     let result: Vec<usize> = result
@@ -355,7 +352,7 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Option<Permu
         .map(|a| a.expect("This should never happen, check code if it does."))
         .collect();
 
-    return Ok(result);
+    return Some(result);
 }
 
 /// Reverse the orientation of a knot diagram.
@@ -495,8 +492,8 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
 
         if rowsum >= colsum {
             match type_0_permutation(matrix.clone(), Dir::Horz) {
-                Ok(h_perm) => {
-                    return Ok(SearchRecord {
+                Some(h_perm) => {
+                    return Some(SearchRecord {
                         stabilizations: 0,
                         vlist: vertlist.clone(),
                         alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
@@ -509,13 +506,14 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                         },
                     });
                 }
+                None => ()
             }
         }
 
         if colsum >= rowsum {
             match type_0_permutation(matrix.clone(), Dir::Vert) {
-                Ok(h_perm) => {
-                    return Ok(SearchRecord {
+                Some(h_perm) => {
+                    return Some(SearchRecord {
                         stabilizations: 0,
                         vlist: vertlist.clone(),
                         alexander_grading: a_grading(&vertlist, &matrix, &h_perm),
@@ -528,15 +526,16 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                         },
                     });
                 }
+                None => ()
             }
         }
         None
     }
 
     if let Some(solution) = try_instance_permutations(vertlist.clone(), false) {
-        solution
+        Some(solution)
     } else if let Some(solution) = try_instance_permutations(rev(vertlist.clone()), true) {
-        solution
+        Some(solution)
     } else {
         None
     }

@@ -53,7 +53,7 @@ pub fn manual_gridstate_finder(
 
         if let Some(record) = current_states
             .par_iter()
-            .filter_map(|a| try_permutations(a).ok())
+            .filter_map(|a| try_permutations(a))
             .find_any(|_| true)
         {
             return Ok(record);

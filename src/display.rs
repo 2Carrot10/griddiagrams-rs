@@ -1,4 +1,4 @@
-use std::{cmp::{max, min}, iter};
+use std::{cmp::{max, min}, fmt::Display, iter};
 
 use crate::knot_core::{v_to_h, DirList};
 
