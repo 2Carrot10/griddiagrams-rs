@@ -35,6 +35,7 @@ pub struct KnotResult {
     pub search_record: Result<SearchRecord, SearchFailure>,
 }
 
+/// Searches for a nice knot based on a search algorithm
 pub fn manual_gridstate_finder(
     vertlists: HashSet<DirList>,
     logging: &LoggingType,
@@ -43,7 +44,7 @@ pub fn manual_gridstate_finder(
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::Single);
 
-    let mut previous_frontier_size = vertlists.len();
+    let mut previous_frontier_size;
     let mut current_states = vertlists;
     let mut visited_states = current_states.clone();
     let mut i = 0;

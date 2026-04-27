@@ -85,7 +85,7 @@ pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
             }
 
             for segment in &mut gridnotation {
-                // Negative indexing
+                // Python-like negative indexing
                 if segment[1] == temp[temp.len() - 1] && segment[0] != current_tuple[0] {
                     temp.push(segment[0].clone());
                     current_tuple = segment.clone();
@@ -193,7 +193,6 @@ pub fn v_to_h(vertlist: &DirList) -> DirList {
     let mut horzlist = vec![];
     for i in 0..n as i32 {
         let mut segment_indicies: (i32, i32) = (-1, -1);
-        // TODO: possibly add check (value can get rewritten)
         for j in 0..n {
             if vertlist.0[j as usize].0 == i {
                 segment_indicies.0 = j as i32;
@@ -287,10 +286,6 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Option<Permu
     };
 
     let n = matrix.len();
-    let type_string = match direction {
-        Dir::Horz => "h-type-0",
-        Dir::Vert => "v-type-0",
-    };
 
     let mut min_indices: Vec<Option<HashSet<usize>>> = matrix
         .into_iter()
@@ -435,27 +430,6 @@ pub fn a_grading(vertlist: &DirList, matrix: &WindingMatrix, permutation: &Permu
     }
 
     -w_sum + a_sum - m
-}
-
-/// Convert vertical permutation to horizontal permutation.
-///
-/// Parameters
-/// ----------
-/// vperm : List[int]
-///     Vertical permutation.
-///
-/// Note
-/// -----
-/// This is only used to have all found grid states in the same format
-///
-/// Returns
-/// -------
-/// List[int]
-///     Horizontal permutation.
-pub fn vperm_to_hperm(vperm: Permutation) -> Permutation {
-    let mut indexed_perm: Vec<(usize, usize)> = (0..vperm.len()).map(|i| (vperm[i], i)).collect();
-    indexed_perm.sort_by_key(|a| a.0);
-    indexed_perm.iter().map(|(_, index)| *index).collect()
 }
 
 /// Try to find a unique perfect grid state for a diagram.

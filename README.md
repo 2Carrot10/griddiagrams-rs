@@ -1,6 +1,7 @@
 # griddiagrams-rs
 `griddiagrams-rs` is an improved, rust-based implementation of [griddiagrams](https://github.com/paulitzlinger/griddiagrams) and its [accompanying paper](https://arxiv.org/abs/2602.02642).
-This tool is used to find "nice", griddiagrams of fibered knots. It has been used to build on the findings of `griddiagrams` by finding nice diagrams 12 previously unsolved knots: 12n79, 12n168, 13n282, 13n917, 13n1279, 13n1281, 13n1413, 13n1826, 13n2915, 13n3089, 13n3904, 13n3932
+This tool is used to find "nice" griddiagrams of fibered knots. It has been used to build on the findings of `griddiagrams` by finding nice diagrams of 12 previously unsolved knots: 12n79, 12n168, 13n282, 13n917, 13n1279, 13n1281, 13n1413, 13n1826, 13n2915, 13n3089, 13n3904, 13n3932
+While most of this project is original code, `knot_core.rs` is primarily a rust translation of `griddiagram`'s `core.py`.
 
 Main improvements:
 - Increased speed
@@ -46,8 +47,9 @@ The search algorithm can be used to create complex sequences of reidemeister mov
 By default, to create the subsequent frontier, the algorithm will only compute moves on the frontier. The following frontier cannot include previously visited nodes. This means that the calculated paths will include only in-between griddiagrams that can not be found more quickly using a different path. Deduplication based on the visited set improves performance, because most griddiagrams will not need to be searched. However, if you would like to disable this, use `< ... >`.
 `{ ... }` is used to represent a union. Unlike regular languages, unions can not contain non-primitive elements. This limitation allows minor code improvements, as states do not need to be tagged.
 ```
+<expr> ::= <num repititions> <primitive-expr>
+<primitive-expr> ::= "(" <expr> ")" | "<" <sequence> ">" | "{" <expr> "}" | <sequence>
 <reidemeister moves> ::= "stabilize" | "commute" | "epsilon" | "switch"
-<expr> ::= "(" <num repititions> <sequence> ")" | "<" <expr> <sequence> ">" | "{" <num repititions> <sequence> "}"
 <sequence> ::= <reidemeister move> | <reidemeister move> "," <sequence>
 <no-deduplicate> ::= "<" <num repititions> <reidemeister moves> ">"
 ```

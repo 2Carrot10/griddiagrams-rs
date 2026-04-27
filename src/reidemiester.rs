@@ -117,7 +117,6 @@ pub fn knot_stab(input_list: &DirList) -> Vec<DirList> {
             grid_stab_combos.push((segment, dir, index));
         }
     }
-    // TODO: fix suboptimal HashSet -> Vec conversion
     grid_stab_combos
         .into_iter()
         .map(|(segment, dir, index)| stabilize(input_list.clone(), segment, dir, index))
