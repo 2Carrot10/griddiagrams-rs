@@ -3,6 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::{self, Write},
 };
+use std::collections::hash_map::Entry::Vacant;
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -74,7 +75,7 @@ pub fn manual_gridstate_finder(
     let mut visited_states: HashMap<DirList, Option<ParentInfo>> = current_states
         .iter()
         .cloned()
-        .map(|s| (s, None)) // roots have no parent
+        .map(|s| (s, None))
         .collect();
     let mut i = 0;
 
@@ -109,7 +110,7 @@ pub fn manual_gridstate_finder(
             let mut next_states = HashSet::new();
 
             for (child, parent, name) in candidates {
-                if let std::collections::hash_map::Entry::Vacant(e) =
+                if let Vacant(e) =
                     visited_states.entry(child.clone())
                 {
                     e.insert(Some(ParentInfo {
