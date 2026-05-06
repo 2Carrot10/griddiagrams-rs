@@ -1,4 +1,5 @@
-use crate::knot_core::{DirList, h_to_v, v_to_h};
+use crate::knot_core::tagged_v_to_h;
+use crate::knot_core::{DirList, v_to_h};
 use std::cmp::max;
 use std::cmp::min;
 
@@ -43,7 +44,8 @@ impl StabDir {
 pub fn adj_elementwise_move_on_predicate(
     input_list: &DirList,
     preciate: impl Fn((i32, i32), (i32, i32)) -> bool,
-) -> Vec<DirList> {
+    name: String
+) -> Vec<(DirList, String)> {
     let mut result = vec![];
     let mut seen = vec![];
 
@@ -59,7 +61,7 @@ pub fn adj_elementwise_move_on_predicate(
 
             if !seen.contains(&swapped_list.0) {
                 seen.push(swapped_list.0.clone());
-                result.push(swapped_list.clone());
+                result.push((swapped_list.clone(), format!("{}{}:{}", name, i, i+1)));
             }
         }
     }
@@ -76,7 +78,7 @@ pub fn adj_elementwise_move_on_predicate(
 
         if !seen.contains(&swapped_list.0) {
             seen.push(swapped_list.0.clone());
-            result.push(swapped_list.clone());
+            result.push((swapped_list.clone(), format!("{}{}:{}", name, 0, index)));
         }
     }
     result
@@ -85,11 +87,12 @@ pub fn adj_elementwise_move_on_predicate(
 pub fn knot_column_and_row_predicate_move(
     vertlist: &DirList,
     predicate: impl Fn((i32, i32), (i32, i32)) -> bool + 'static,
-) -> Vec<DirList> {
-    let v_list = adj_elementwise_move_on_predicate(vertlist, &predicate);
-    let h_list = adj_elementwise_move_on_predicate(&v_to_h(vertlist), &predicate); // Bad clone
-    let mut h_to_v_commutations: Vec<DirList> =
-        h_list.into_iter().map(|a| h_to_v(&a)).collect();
+    name: String
+) -> Vec<(DirList, String)> {
+    let v_list = adj_elementwise_move_on_predicate(vertlist, &predicate, name.clone());
+    let h_list = adj_elementwise_move_on_predicate(&v_to_h(vertlist), &predicate, name); // Bad clone
+    let mut h_to_v_commutations: Vec<(DirList, String)> =
+        h_list.into_iter().map(|a| tagged_v_to_h(&a)).collect();
 
     h_to_v_commutations.extend(v_list);
 
@@ -97,20 +100,20 @@ pub fn knot_column_and_row_predicate_move(
 }
 
 // All of these can contain duplicates
-pub fn knot_switch(vertlist: &DirList) -> Vec<DirList> {
-    knot_column_and_row_predicate_move(vertlist, can_switch)
+pub fn knot_switch(vertlist: &DirList) -> Vec<(DirList, String)> {
+    knot_column_and_row_predicate_move(vertlist, can_switch, String::from("switch"))
 }
 
-pub fn knot_commute(vertlist: &DirList) -> Vec<DirList> {
-    knot_column_and_row_predicate_move(vertlist, can_commute)
+pub fn knot_commute(vertlist: &DirList) -> Vec<(DirList, String)> {
+    knot_column_and_row_predicate_move(vertlist, can_commute, String::from("commute"))
 }
 
 
-pub fn knot_epsilon(vertlist: &DirList) -> Vec<DirList> {
-    vec![vertlist.clone()]
+pub fn knot_epsilon(vertlist: &DirList) -> Vec<(DirList, String)> {
+    vec![(vertlist.clone(), String::from("epsilon"))]
 }
 
-pub fn knot_stab(input_list: &DirList) -> Vec<DirList> {
+pub fn knot_stab(input_list: &DirList) -> Vec<(DirList, String)> {
     let mut grid_stab_combos = vec![];
     for segment in input_list.0.clone() {
         for (index, dir) in STAB_COMBINATIONS {
@@ -145,18 +148,18 @@ pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
     (a == d) || (c == b)
 }
 
-pub fn knot_destab(vertlist: &DirList) -> Vec<DirList> {
+pub fn knot_destab(vertlist: &DirList) -> Vec<(DirList, String)> {
     let v_commutations = destab_move(vertlist);
     let h_commutations = destab_move(&v_to_h(vertlist));
-    let mut h_to_v_commutations: Vec<DirList> =
-        h_commutations.into_iter().map(|a| h_to_v(&a)).collect();
+    let mut h_to_v_commutations: Vec<(DirList, String)> =
+        h_commutations.into_iter().map(|a| tagged_v_to_h(&a)).collect();
 
     h_to_v_commutations.extend(v_commutations);
 
     h_to_v_commutations
 }
 
-fn destab_move(vertlist: &DirList) -> Vec<DirList> {
+fn destab_move(vertlist: &DirList) -> Vec<(DirList, String)> {
     let mut result = vec![];
 
     let n = vertlist.0.len();
@@ -177,8 +180,9 @@ fn destab_move(vertlist: &DirList) -> Vec<DirList> {
                 }
             }
 
-            if !result.contains(&swapped_list) {
-                result.push(swapped_list.clone());
+            let elem = (swapped_list.clone(), format!("Destab{}", i));
+            if !result.contains(&elem) {
+                result.push(elem);
             }
         }
     }
@@ -195,7 +199,7 @@ pub fn stabilize(
     loc: (i32, i32),
     direction: StabDir,
     tuple_index: usize,
-) -> DirList {
+) -> (DirList, String) {
     let is_north = direction.is_north();
     let is_west = direction.is_west();
 
@@ -226,5 +230,5 @@ pub fn stabilize(
     temp.insert(k + insert_offset, segment);
     temp[k + remainder_offset][tuple_index] = loc[tuple_index] + if is_north { 1 } else { 0 };
 
-    DirList(temp.iter().map(|[a, b]| (*a, *b)).collect())
+    (DirList(temp.iter().map(|[a, b]| (*a, *b)).collect()), format!("stabilize{}:{}", loc[0], loc[1]))
 }

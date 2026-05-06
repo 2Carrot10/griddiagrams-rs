@@ -17,8 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    data::{get_all_knot_names, get_vlist_by_name, load_knot_data},
-    search::{manual_gridstate_finder, KnotResult, SearchFailure}, vertlist::string_to_vertmap,
+    data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, search::{manual_gridstate_finder, KnotResult, SearchFailure}, vertlist::string_to_vertmap
 };
 
 use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_search};
@@ -60,6 +59,11 @@ struct Args {
 
     #[arg(short = 'n', long, default_value_t = 200)]
     depth: i32,
+
+    /// How many knots can exist in memory at the same time (used to prevent the thread from being
+    /// killed due to memory usage)
+    #[arg(long)]
+    max_knots: Option<i32>,
 
     /// Will default to the number of cores available on the system
     #[arg(short, long)]
@@ -162,9 +166,10 @@ fn main() {
         }
 
         let mut search_record = manual_gridstate_finder(
-            HashSet::from([vertlist]),
+            HashSet::from([vertlist.clone()]),
             &logging_type,
             knot_finder.clone(),
+            args.max_knots
         );
         if matches!(logging_type, LoggingType::Single) {
             println!();
@@ -174,6 +179,7 @@ fn main() {
             Ok(ok) => {
                 if log_positives {
                     println!("Found nice knot for {}, #{}: {:?}", knot, i, ok.vlist.0);
+                    println!("Used the following path: {}", ok.path.clone().unwrap().join(", "));
 
                     if !matches!(logging_type, LoggingType::None) {
                         if !args.hide_diagrams {
@@ -198,10 +204,20 @@ fn main() {
                     );
                 }
             }
+            Err(SearchFailure::OutOfMemory) => {
+                if log_negatives {
+                    println!(
+                        "Could not find nice knot for {}, #{} (out of memory error)",
+                        knot, i
+                    );
+                }
+            }
+
         }
         results.push(KnotResult {
             search_record,
             knot,
+            starting_vertlist: vertlist
         });
     }
 
@@ -222,23 +238,31 @@ fn compute_analytics(results: &Vec<KnotResult>) {
     let total_length = results.len();
     println!("Total: {}", total_length);
 
-    let (positive_results, frontier_error, depth_error) = results
+    let (positive_results, frontier_error, depth_error, out_of_memory_error) = results
         .iter()
         .map(|result| match result {
             KnotResult {
                 search_record: Ok(_),
                 knot: _,
-            } => (1, 0, 0),
+                starting_vertlist: _
+            } => (1, 0, 0, 0),
             KnotResult {
                 search_record: Err(SearchFailure::ExhaustedSearchSpace),
                 knot: _,
-            } => (0, 1, 0),
+                starting_vertlist: _
+            } => (0, 1, 0, 0),
             KnotResult {
                 search_record: Err(SearchFailure::HitDepthLimit),
                 knot: _,
-            } => (0, 0, 1),
+                starting_vertlist: _
+            } => (0, 0, 1, 0),
+            KnotResult {
+                search_record: Err(SearchFailure::OutOfMemory),
+                knot: _,
+                starting_vertlist: _
+            } => (0, 0, 0, 1),
         })
-        .reduce(|(x1, y1, z1), (x2, y2, z2)| (x1 + x2, y1 + y2, z1 + z2))
+        .reduce(|(w1, x1, y1, z1), (w2, x2, y2, z2)| (w1 + w2, x1 + x2, y1 + y2, z1 + z2))
         .unwrap();
 
     println!(
@@ -249,7 +273,7 @@ fn compute_analytics(results: &Vec<KnotResult>) {
     println!(
         "Negative results: {}   {}%",
         frontier_error + depth_error,
-        (100 * (frontier_error + depth_error)) / total_length
+        (100 * (frontier_error + depth_error + out_of_memory_error)) / total_length
     );
     println!(
         "   Depth error: {}   {}%",
@@ -260,6 +284,11 @@ fn compute_analytics(results: &Vec<KnotResult>) {
         "   Frontier error: {}   {}%",
         frontier_error,
         (100 * frontier_error) / total_length
+    );
+    println!(
+        "   Out of memory error: {}   {}%",
+        out_of_memory_error,
+        (100 * out_of_memory_error) / total_length
     );
 }
 
@@ -272,15 +301,23 @@ fn save_results(file_name: String, results: &Vec<KnotResult>) {
                 KnotResult {
                     search_record: Ok(_),
                     knot: _,
+                    starting_vertlist: _
                 } => "found diagram",
                 KnotResult {
                     search_record: Err(SearchFailure::HitDepthLimit),
                     knot: _,
+                    starting_vertlist: _
                 } => "depth error",
                 KnotResult {
                     search_record: Err(SearchFailure::ExhaustedSearchSpace),
                     knot: _,
+                    starting_vertlist: _
                 } => "space exhausted error",
+                KnotResult {
+                    search_record: Err(SearchFailure::OutOfMemory),
+                    knot: _,
+                    starting_vertlist: _
+                } => "out of memory",
             }
             .to_string(),
         );
@@ -298,7 +335,7 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
     let keys: Vec<String> = json_string
         .keys()
         .filter_map(|key| match json_string.get(key).and_then(|v| v.as_str()) {
-            Some("space exhausted error") | Some("depth error") => Some(key.clone()),
+            Some("space exhausted error") | Some("depth error") | Some("out of memory error") => Some(key.clone()),
             Some(_) => None,
             None => None,
         })
@@ -316,20 +353,28 @@ fn save_results_verbose(file_name: String, results: &Vec<KnotResult>) {
             KnotResult {
                 search_record: Ok(record),
                 knot: _,
+                starting_vertlist
             } => 
                 json!({
-                    "vlist": record.vlist,
-                    "winding-matrix": record.matrix,
-                    "gridstate": record.gridstate
+                    "starting_vlist": starting_vertlist,
+                    "ending_vlist": record.vlist,
+                    "path": record.path
                 }),
             KnotResult {
                 search_record: Err(SearchFailure::HitDepthLimit),
                 knot: _,
+                starting_vertlist: _
             } => serde_json::from_str("\"depth error\"").unwrap(),
             KnotResult {
                 search_record: Err(SearchFailure::ExhaustedSearchSpace),
                 knot: _,
+                starting_vertlist: _
             } => serde_json::from_str("\"space exhausted error\"").unwrap(),
+            KnotResult {
+                search_record: Err(SearchFailure::OutOfMemory),
+                knot: _,
+                starting_vertlist: _
+            } => serde_json::from_str("\"out of memory error\"").unwrap(),
         }
         );
     }

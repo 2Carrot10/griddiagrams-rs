@@ -7,8 +7,8 @@ use crate::{
 
 use regex::Regex;
 
-type MoveFunction = fn(&DirList) -> Vec<DirList>;
-type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<DirList> + Sync>;
+type MoveFunction = fn(&DirList) -> Vec<(DirList, String)>;
+type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<(DirList, String)> + Sync>;
 
 trait AlgorithmGrammar {
     fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)>;
@@ -183,7 +183,7 @@ impl KnotFinder {
 
     pub fn build_search_type(
         depth: i32,
-        function: fn(&DirList) -> Vec<DirList>,
+        function: fn(&DirList) -> Vec<(DirList, String)>,
         name: String,
     ) -> KnotFinder {
         KnotFinder(SearchType::Repeat(RepeatSearchType {
@@ -250,7 +250,6 @@ pub fn read_to_knot_finder(filename: String) -> KnotFinder {
     let knot_finder = KnotFinder(parse_expr(&mut tokens).unwrap());
 
     assert_eq!(tokens.peek(), None, "Parser failed");
-    // println!("{:?}", knot_finder);
     knot_finder
 }
 
@@ -300,7 +299,7 @@ fn parse_parens(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Sea
         return result;
     }
 
-    // Deduplicate
+    // deduplicate
     if consume_if_equals(tokens, "<") {
         let result = parse_expr(tokens);
         assert_eq!(tokens.next(), Some(">".to_string()));

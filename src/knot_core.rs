@@ -177,7 +177,7 @@ pub fn vlist(gridlist: GridList) -> DirList {
     DirList(vsegments.into_iter().flatten().collect())
 }
 
-/// Convert vertical segment list to horizontal segment list.
+/// Convert vertical segment list to horizontal segment list or converts horizontal segment list to vertical segment list
 ///
 /// Parameters
 /// ----------
@@ -206,9 +206,22 @@ pub fn v_to_h(vertlist: &DirList) -> DirList {
     DirList(horzlist)
 }
 
-// The two functions are equivalent
-pub fn h_to_v(horzlist: &DirList) -> DirList {
-    v_to_h(horzlist)
+pub fn tagged_v_to_h(vertlist: &(DirList, String)) -> (DirList, String) {
+    let n = vertlist.0.0.len();
+    let mut horzlist = vec![];
+    for i in 0..n as i32 {
+        let mut segment_indicies: (i32, i32) = (-1, -1);
+        for j in 0..n {
+            if vertlist.0.0[j as usize].0 == i {
+                segment_indicies.0 = j as i32;
+            } else if vertlist.0.0[j as usize].1 == i {
+                segment_indicies.1 = j as i32;
+            }
+        }
+
+        horzlist.push(segment_indicies);
+    }
+    (DirList(horzlist), format!("{}(V-H)", vertlist.1.clone()))
 }
 
 pub fn is_valid(dirlist: &DirList) -> bool {
@@ -478,6 +491,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                         } else {
                             String::from("h_type_0_rev")
                         },
+                        path: None
                     });
                 }
                 None => ()
@@ -498,6 +512,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
                         } else {
                             String::from("v_type_0_rev")
                         },
+                        path: None
                     });
                 }
                 None => ()

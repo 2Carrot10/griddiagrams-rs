@@ -1,6 +1,6 @@
 use std::{
     cmp::min,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     io::{self, Write},
 };
 
@@ -21,18 +21,42 @@ pub struct SearchRecord {
     pub gridstate: Permutation,
     pub perm_type: String,
     pub alexander_grading: i32,
+    pub path: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SearchFailure {
     HitDepthLimit,
     ExhaustedSearchSpace,
+    OutOfMemory,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KnotResult {
     pub knot: String,
+    pub starting_vertlist: DirList,
     pub search_record: Result<SearchRecord, SearchFailure>,
+}
+
+#[derive(Debug)]
+struct ParentInfo {
+    parent: DirList,
+    move_name: String,
+}
+
+fn reconstruct_path(
+    visited: &HashMap<DirList, Option<ParentInfo>>,
+    mut node: DirList,
+) -> Vec<String> {
+    let mut moves = Vec::new();
+
+    while let Some(Some(info)) = visited.get(&node) {
+        moves.push(info.move_name.clone());
+        node = info.parent.clone();
+    }
+
+    moves.reverse();
+    moves
 }
 
 /// Searches for a nice knot based on a search algorithm
@@ -40,43 +64,91 @@ pub fn manual_gridstate_finder(
     vertlists: HashSet<DirList>,
     logging: &LoggingType,
     mut knot_finder: KnotFinder,
+    max_knots: Option<i32>,
 ) -> Result<SearchRecord, SearchFailure> {
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::Single);
 
     let mut previous_frontier_size;
     let mut current_states = vertlists;
-    let mut visited_states = current_states.clone();
+    let mut visited_states: HashMap<DirList, Option<ParentInfo>> = current_states
+        .iter()
+        .cloned()
+        .map(|s| (s, None)) // roots have no parent
+        .collect();
     let mut i = 0;
 
     while let Some((knot_finding_function, move_name, dedup)) = knot_finder.next() {
         previous_frontier_size = current_states.len();
+        if let Some(max_knots) = max_knots {
+            if previous_frontier_size as i32 > max_knots {
+                return Err(SearchFailure::OutOfMemory);
+            }
+        }
 
-        if let Some(record) = current_states
+        if let Some((dirlist, mut record)) = current_states
             .par_iter()
-            .filter_map(|a| try_permutations(a))
+            .filter_map(|a| try_permutations(&a).map(|b| (a, b)))
             .find_any(|_| true)
         {
+            let path = reconstruct_path(&visited_states, dirlist.clone());
+            record.path = Some(path);
             return Ok(record);
         }
 
         if dedup {
-            current_states = current_states
+            let candidates: Vec<(DirList, DirList, String)> = current_states
                 .par_iter()
-                .flat_map(|r| knot_finding_function(&r))
-                .filter(|a| !current_states.contains(a) && !visited_states.contains(a))
-                .collect::<HashSet<_>>();
+                .flat_map_iter(|r| {
+                    knot_finding_function(r)
+                        .into_iter()
+                        .map(|(child, name)| (child, r.clone(), name))
+                })
+                .collect();
 
-            if current_states.is_empty() {
+            let mut next_states = HashSet::new();
+
+            for (child, parent, name) in candidates {
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    visited_states.entry(child.clone())
+                {
+                    e.insert(Some(ParentInfo {
+                        parent,
+                        move_name: name,
+                    }));
+                    next_states.insert(child);
+                }
+            }
+
+            if next_states.is_empty() {
                 return Err(SearchFailure::ExhaustedSearchSpace);
             }
 
-            visited_states.extend(current_states.clone());
+            current_states = next_states;
         } else {
-            current_states = current_states
+            let candidates: Vec<(DirList, DirList, String)> = current_states
                 .par_iter()
-                .flat_map(|r| knot_finding_function(&r))
-                .collect::<HashSet<_>>();
+                .flat_map_iter(|r| {
+                    knot_finding_function(r)
+                        .into_iter()
+                        .map(|(child, name)| (child, r.clone(), name))
+                })
+                .collect();
+
+            let mut next_states = HashSet::new();
+
+            for (child, parent, name) in candidates {
+                visited_states.entry(child.clone()).or_insert_with(|| {
+                    Some(ParentInfo {
+                        parent,
+                        move_name: name,
+                    })
+                });
+
+                next_states.insert(child);
+            }
+
+            current_states = next_states;
         }
         i += 1;
 
@@ -87,7 +159,7 @@ pub fn manual_gridstate_finder(
                 previous_frontier_size,
                 single_line,
                 &move_name,
-                dedup
+                dedup,
             );
         }
     }
@@ -113,7 +185,15 @@ fn gridstate_log(
         "-".repeat(30 - format_blocks)
     );
     print!("Ratio change: {:.2}%", 100.0 * ratio);
-    print!("    {} {}", move_name, if dedup { "de-duplicate" } else { "preserve-all" });
+    print!(
+        "    {} {}",
+        move_name,
+        if dedup {
+            "de-duplicate"
+        } else {
+            "preserve-all"
+        }
+    );
 
     if single_line {
         print!("\r");
