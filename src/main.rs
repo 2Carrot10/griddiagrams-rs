@@ -1,7 +1,7 @@
 #![feature(if_let_guard)]
 mod data;
 mod knot_core;
-mod knot_finder_grammer;
+mod knot_finder_grammar;
 mod reidemiester;
 mod search;
 mod display;
@@ -20,7 +20,7 @@ use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, search::{manual_gridstate_finder, KnotResult, SearchFailure}, vertlist::string_to_vertmap
 };
 
-use crate::knot_finder_grammer::{commute_search, read_to_knot_finder, stab_search};
+use crate::knot_finder_grammar::{commute_search, read_to_knot_finder, stab_search};
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(version)]

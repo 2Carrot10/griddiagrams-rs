@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     LoggingType,
     knot_core::{DirList, Permutation, WindingMatrix, try_permutations},
-    knot_finder_grammer::KnotFinder,
+    knot_finder_grammar::KnotFinder,
 };
 
 /// A result after attempting to search for a nice grid diagram
