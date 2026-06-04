@@ -46,8 +46,6 @@ impl Display for DirList {
 
 impl std::fmt::Debug for DirList {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
-        return std::fmt::Result::Ok(());
         let horzlist = v_to_h(self);
         let hlen = horzlist.0.len();
         for (x, o) in &horzlist.0 {

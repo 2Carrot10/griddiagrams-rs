@@ -50,7 +50,9 @@ impl<'de> Deserialize<'de> for GridNotationContainer {
     }
 }
 
-// Either VertList or HorzList
+// A DirList is either VertList or HorzList. Disambiguation relies on the situation in which it is
+// used, though the difference does not usually matter as two equivalent dirlists, where one is a
+// vertlist and the other is a horzlist represent the same knot.
 #[derive(Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct DirList(pub Vec<(i32, i32)>);
 
@@ -63,6 +65,8 @@ impl PartialEq for DirList {
     }
 }
 
+/// The directional at which a dirlist is being viewed. This enum is on occasion necessary because
+/// [`DirList`] represents both Horzlist and Vertlist.
 pub enum Dir {
     Horz,
     Vert,
@@ -109,6 +113,9 @@ pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
     return temp.into_iter().map(|x| x - 1).collect();
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Convert grid list to horizontal segment list.
 /// Parameter
 /// ----------
@@ -143,6 +150,9 @@ pub fn hlist(gridlist: GridList) -> DirList {
     DirList(hsegments.into_iter().flatten().collect())
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Convert grid list to vertical segment list.
 ///
 /// Parameters
@@ -177,6 +187,9 @@ pub fn vlist(gridlist: GridList) -> DirList {
     DirList(vsegments.into_iter().flatten().collect())
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Convert vertical segment list to horizontal segment list or converts horizontal segment list to vertical segment list
 ///
 /// Parameters
@@ -206,6 +219,7 @@ pub fn v_to_h(vertlist: &DirList) -> DirList {
     DirList(horzlist)
 }
 
+/// Computes `v_to_h` while preserving the string associated with each [`DirList`]
 pub fn tagged_v_to_h(vertlist: &(DirList, String)) -> (DirList, String) {
     let n = vertlist.0.0.len();
     let mut horzlist = vec![];
@@ -224,10 +238,18 @@ pub fn tagged_v_to_h(vertlist: &(DirList, String)) -> (DirList, String) {
     (DirList(horzlist), format!("{}(V-H)", vertlist.1.clone()))
 }
 
+/// Checks if `dirlist` represents a valid knot or link.
+/// Specifically, this function checks that each row and column has exactly one x and o each.
 pub fn is_valid(dirlist: &DirList) -> bool {
     let len = dirlist.0.len();
+    // The following code uses clever bitwise arithmetic.
+    // Each of these integers is treated as a list of booleans
+    // bitshifts and bitwise or is used to fill the array.
+    // An array with all true values when interpreted as a integer is equal in value 2^n - 1 where n
+    // is the length of the array
     let mut x_binsum = 0;
     let mut y_binsum = 0;
+
     for (x, o) in &dirlist.0 {
         if (*x as usize) >= len || (*o as usize) >= len {
             return false;
@@ -240,6 +262,9 @@ pub fn is_valid(dirlist: &DirList) -> bool {
     ((x_binsum + 1) == (1 << len)) && ((y_binsum + 1) == (1 << len))
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Calculate the winding matrix for a knot grid diagram.
 ///
 /// Parameters
@@ -280,6 +305,9 @@ pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
     result
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 // Find a unique horizontal or vertical type-0 permutation (i.e. a unique row-perfect grid state) if it exists.
 //
 // Parameters
@@ -363,6 +391,9 @@ pub fn type_0_permutation(matrix: WindingMatrix, direction: Dir) -> Option<Permu
     return Some(result);
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Reverse the orientation of a knot diagram.
 ///
 /// Parameters
@@ -378,6 +409,9 @@ pub fn rev(input_list: DirList) -> DirList {
     DirList(input_list.0.into_iter().map(|(a, b)| (b, a)).collect())
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Calculate the Alexander grading for a grid state.
 ///
 /// Parameters
@@ -445,6 +479,9 @@ pub fn a_grading(vertlist: &DirList, matrix: &WindingMatrix, permutation: &Permu
     -w_sum + a_sum - m
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Try to find a unique perfect grid state for a diagram.
 ///
 /// Parameters
@@ -530,6 +567,7 @@ pub fn try_permutations(vertlist: &DirList) -> Option<SearchRecord> {
     }
 }
 
+/// Transposes a matrix. Can be used in converting a horzlist into a vertlist.
 pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     assert!(!v.is_empty());
     let len = v[0].len();
@@ -540,6 +578,9 @@ pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
         .collect()
 }
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
+///
 /// Convert vertical list to X and O permutations.
 ///
 /// Note

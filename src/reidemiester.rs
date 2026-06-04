@@ -3,6 +3,10 @@ use crate::knot_core::{DirList, v_to_h};
 use std::cmp::max;
 use std::cmp::min;
 
+/// The direction of stabilization.
+/// For instance, this is NW stab on a ✗:
+/// ✗   ->  ·✗
+///         ✗○
 pub enum StabDir {
     NorthWest,
     SouthWest,
@@ -10,6 +14,9 @@ pub enum StabDir {
     SouthEast,
 }
 
+/// All possible combinations of stabilization that can be completed on a given column.
+/// A stabilization can be completed on a x or o square, in any of the four stabilization
+/// directions.
 pub const STAB_COMBINATIONS: [(usize, StabDir); 8] = [
     (0, StabDir::NorthWest),
     (1, StabDir::NorthWest),
@@ -99,7 +106,6 @@ pub fn knot_column_and_row_predicate_move(
     h_to_v_commutations
 }
 
-// All of these can contain duplicates
 pub fn knot_switch(vertlist: &DirList) -> Vec<(DirList, String)> {
     knot_column_and_row_predicate_move(vertlist, can_switch, String::from("switch"))
 }
@@ -125,6 +131,10 @@ pub fn knot_stab(input_list: &DirList) -> Vec<(DirList, String)> {
         .collect()
 }
 
+/// Checks if two adjacent columns or rows can undergo the reidemeister move of commutation
+/// `t1` - the indicies of the x and o for the given slice of the dirlist.
+/// `t2` - the indicies of the x and o for the given slice of the dirlist.
+/// Note that `t1` and `t2` must be adjacent columns.
 pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
     let (a, b) = t1;
     let (c, d) = t2;
@@ -140,13 +150,17 @@ pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
         || (max2 >= max1 && min2 <= min1)
 }
 
-// Arguments t1 and t2 must be next to each other
+/// Checks if two adjacent columns or rows can undergo the reidemeister move of switch
+/// `t1` - the indicies of the x and o for the given slice of the dirlist.
+/// `t2` - the indicies of the x and o for the given slice of the dirlist.
+/// Note that `t1` and `t2` must be adjacent columns.
 pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
     let (a, b) = t1;
     let (c, d) = t2;
     (a == d) || (c == b)
 }
 
+/// Computes all possible destabilizations.
 pub fn knot_destab(vertlist: &DirList) -> Vec<(DirList, String)> {
     let v_commutations = destab_move(vertlist);
     let h_commutations = destab_move(&v_to_h(vertlist));
@@ -191,7 +205,10 @@ fn destab_move(vertlist: &DirList) -> Vec<(DirList, String)> {
     result
 }
 
+/// Checks if a column or row can be destabilized.
 fn can_destab((x, o): (i32, i32)) -> bool {
+    // Interestingly, adjacency of the x and o values is the only check necessary for this
+    // otherwise complicated operation
     (x - o).abs() == 1
 }
 

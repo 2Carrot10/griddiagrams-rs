@@ -227,7 +227,7 @@ pub fn read_to_knot_finder(filename: String) -> KnotFinder {
     let binding = &std::fs::read(filename).unwrap();
     let text = str::from_utf8(binding).unwrap();
 
-    // tokenize:
+    // tokenize
     let re = Regex::new(
         r#"(?x)
         \d+                             |

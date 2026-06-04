@@ -83,6 +83,8 @@ pub enum LoggingType {
     Multiline,
 }
 
+/// Handles and parses user input, then executes each knot using the chosen algorithm and prints
+/// relevant analytics
 fn main() {
     let args = Args::parse();
     let csv = load_knot_data();
