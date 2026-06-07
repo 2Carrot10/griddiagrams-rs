@@ -20,7 +20,7 @@ use crate::{
     data::{get_all_knot_names, get_vlist_by_name, load_knot_data}, search::{manual_gridstate_finder, KnotResult, SearchFailure}, vertlist::string_to_vertmap
 };
 
-use crate::knot_finder_grammar::{commute_search, read_to_knot_finder, stab_search};
+use crate::knot_finder_grammar::{commute_search, read_to_knot_finder, stab_commute_search};
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(version)]
@@ -60,8 +60,8 @@ struct Args {
     #[arg(short = 'n', long, default_value_t = 200)]
     depth: i32,
 
-    /// How many knots can exist in memory at the same time (used to prevent the thread from being
-    /// killed due to memory usage)
+    /// The number of knots  that can exist in memory at the same time (used to prevent the thread from 
+    /// being killed due to memory usage)
     #[arg(long)]
     max_knots: Option<i32>,
 
@@ -69,10 +69,17 @@ struct Args {
     #[arg(short, long)]
     threads: Option<i32>,
 
+    /// Display grid diagrams using traditional x and o symbols instead of pretty visualised
+    /// strands. Makes the knot more difficult to visually parse but may be useful for technical
+    /// purposes.
+    #[arg(long)]
+    print_raw_diagrams: bool,
+    
+
     #[arg(long)]
     hide_diagrams: bool,
 
-    /// store nice diagram instead of just weather or not it exists
+    /// store nice diagram instead of just whether or not it exists
     #[arg(long)]
     verbose_output: bool,
 }
@@ -153,7 +160,7 @@ fn main() {
     let mut results = vec![];
 
     let knot_finder = match args.algorithm.as_str() {
-        "stab" | "stabilize" => stab_search(args.depth),
+        "stab" | "stabilize" => stab_commute_search(args.depth),
         "commute" => commute_search(args.depth),
         filename => read_to_knot_finder(filename.to_string()),
     };
@@ -164,7 +171,11 @@ fn main() {
             println!("----");
             println!("# {}: {}", i, knot);
             if !args.hide_diagrams {
-                println!("{}", vertlist);
+                if args.print_raw_diagrams {
+                    println!("{}", vertlist);
+                } else {
+                    println!("{:?}", vertlist);
+                }
             }
         }
 
@@ -186,7 +197,12 @@ fn main() {
 
                     if !matches!(logging_type, LoggingType::None) {
                         if !args.hide_diagrams {
-                            println!("{}", ok.vlist);
+                            
+                            if args.print_raw_diagrams {
+                                println!("{}", ok.vlist);
+                            } else {
+                                println!("{:?}", ok.vlist);
+                            }
                         }
                     }
                 }

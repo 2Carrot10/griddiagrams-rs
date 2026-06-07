@@ -8,7 +8,7 @@ pub type GridNotation = Vec<Vec<i32>>;
 
 #[derive(Debug, Clone)]
 pub struct GridNotationContainer(pub GridNotation);
-pub type GridList = Vec<i32>;
+pub type GridList = Vec<IndexSize>;
 impl<'de> Deserialize<'de> for GridNotationContainer {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -50,11 +50,14 @@ impl<'de> Deserialize<'de> for GridNotationContainer {
     }
 }
 
+// Using a smaller index size should significantly increase space efficiency
+pub type IndexSize = i8;
+
 // A DirList is either VertList or HorzList. Disambiguation relies on the situation in which it is
 // used, though the difference does not usually matter as two equivalent dirlists, where one is a
 // vertlist and the other is a horzlist represent the same knot.
 #[derive(Clone, Eq, Hash, Serialize, Deserialize)]
-pub struct DirList(pub Vec<(i32, i32)>);
+pub struct DirList(pub Vec<(IndexSize, IndexSize)>);
 
 impl PartialEq for DirList {
     fn eq(&self, other: &Self) -> bool {
@@ -112,7 +115,7 @@ pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
             }
         }
     }
-    return temp.into_iter().map(|x| x - 1).collect();
+    return temp.into_iter().map(|x| (x - 1) as IndexSize).collect();
 }
 
 /// --- Function translated into rust from the griddiagrams. More info in README.md ---
@@ -172,7 +175,7 @@ pub fn vlist(gridlist: GridList) -> DirList {
 
     let n = extended_grid.len();
 
-    let mut x = n as i32 + 1;
+    let mut x = n as IndexSize + 1;
     let mut vsegments = vec![None; 2 * n + 1];
     vsegments[x as usize] = Some((extended_grid[0], extended_grid[2]));
 
@@ -206,13 +209,13 @@ pub fn vlist(gridlist: GridList) -> DirList {
 pub fn v_to_h(vertlist: &DirList) -> DirList {
     let n = vertlist.0.len();
     let mut horzlist = vec![];
-    for i in 0..n as i32 {
-        let mut segment_indicies: (i32, i32) = (-1, -1);
+    for i in 0..n as IndexSize {
+        let mut segment_indicies: (IndexSize, IndexSize) = (-1, -1);
         for j in 0..n {
             if vertlist.0[j as usize].0 == i {
-                segment_indicies.0 = j as i32;
+                segment_indicies.0 = j as IndexSize;
             } else if vertlist.0[j as usize].1 == i {
-                segment_indicies.1 = j as i32;
+                segment_indicies.1 = j as IndexSize;
             }
         }
 
@@ -225,13 +228,13 @@ pub fn v_to_h(vertlist: &DirList) -> DirList {
 pub fn tagged_v_to_h(vertlist: &(DirList, String)) -> (DirList, String) {
     let n = vertlist.0.0.len();
     let mut horzlist = vec![];
-    for i in 0..n as i32 {
-        let mut segment_indicies: (i32, i32) = (-1, -1);
+    for i in 0..n as IndexSize {
+        let mut segment_indicies: (IndexSize, IndexSize) = (-1, -1);
         for j in 0..n {
             if vertlist.0.0[j as usize].0 == i {
-                segment_indicies.0 = j as i32;
+                segment_indicies.0 = j as IndexSize;
             } else if vertlist.0.0[j as usize].1 == i {
-                segment_indicies.1 = j as i32;
+                segment_indicies.1 = j as IndexSize;
             }
         }
 
@@ -286,15 +289,15 @@ pub fn is_valid(dirlist: &DirList) -> bool {
 pub fn w_matrix(vertlist: DirList) -> WindingMatrix {
     let size = vertlist.0.len();
     let mut result = vec![];
-    for i in 0..size {
+    for i in 0..(size as IndexSize) {
         let mut row = vec![0];
         for j in 0..(size - 1) {
             let (tail, head) = vertlist.0[j];
 
             let prev = row[row.len() - 1];
-            if tail <= (i as i32) && (i as i32) < head {
+            if tail <= i && i < head {
                 row.push(prev + 1);
-            } else if head <= (i as i32) && (i as i32) < tail {
+            } else if head <= i && i < tail {
                 row.push(prev - 1);
             } else {
                 row.push(prev);
@@ -599,10 +602,10 @@ pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 /// Tuple[List[int], List[int]]
 ///     X and O permutations.
 #[allow(dead_code)]
-pub fn vlist_to_xo(vertlist: DirList) -> (Vec<i32>, Vec<i32>) {
-    let n = (vertlist.0.len() as i32) - 1;
-    let tempx: Vec<i32> = vertlist.0.iter().map(|a| a.0).collect();
-    let tempo: Vec<i32> = vertlist.0.iter().map(|a| a.1).collect();
+pub fn vlist_to_xo(vertlist: DirList) -> (Vec<IndexSize>, Vec<IndexSize>) {
+    let n = (vertlist.0.len() as IndexSize) - 1;
+    let tempx: Vec<IndexSize> = vertlist.0.iter().map(|a| a.0).collect();
+    let tempo: Vec<IndexSize> = vertlist.0.iter().map(|a| a.1).collect();
 
     let x = tempx.iter().map(|x| n - x).collect();
     let o = tempo.iter().map(|x| n - x).collect();

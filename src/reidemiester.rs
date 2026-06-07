@@ -1,4 +1,4 @@
-use crate::knot_core::tagged_v_to_h;
+use crate::knot_core::{IndexSize, tagged_v_to_h};
 use crate::knot_core::{DirList, v_to_h};
 use std::cmp::max;
 use std::cmp::min;
@@ -161,7 +161,7 @@ pub fn knot_stab(input_list: &DirList) -> Vec<(DirList, String)> {
 /// `t1` - the indicies of the x and o for the given slice of the dirlist.
 /// `t2` - the indicies of the x and o for the given slice of the dirlist.
 /// Note that `t1` and `t2` must be adjacent columns.
-pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
+pub fn can_commute(t1: (IndexSize, IndexSize), t2: (IndexSize, IndexSize)) -> bool {
     let (a, b) = t1;
     let (c, d) = t2;
 
@@ -180,7 +180,7 @@ pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
 /// `t1` - the indicies of the x and o for the given slice of the dirlist.
 /// `t2` - the indicies of the x and o for the given slice of the dirlist.
 /// Note that `t1` and `t2` must be adjacent columns.
-pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
+pub fn can_switch(t1: (IndexSize, IndexSize), t2: (IndexSize, IndexSize)) -> bool {
     let (a, b) = t1;
     let (c, d) = t2;
     (a == d) || (c == b)
@@ -267,7 +267,7 @@ fn can_destab((x, o): (i32, i32)) -> bool {
 /// options for the center of stabilization.
 pub fn stabilize(
     vertlist: DirList,
-    loc: (i32, i32),
+    loc: (IndexSize, IndexSize),
     direction: StabDir,
     tuple_index: usize,
 ) -> (DirList, String) {

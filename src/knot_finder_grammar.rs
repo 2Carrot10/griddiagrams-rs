@@ -10,27 +10,36 @@ use regex::Regex;
 type MoveFunction = fn(&DirList) -> Vec<(DirList, String)>;
 type DynamicMoveFunction = Box<dyn Fn(&DirList) -> Vec<(DirList, String)> + Sync>;
 
+type MoveConfiguration<'a> = (DynamicMoveFunction, &'a MoveOptions);
+
+#[derive(Clone, Debug)]
+struct MoveOptions {
+    name: String,
+    dedup: bool,
+    verify_niceness: bool
+}
+
 trait AlgorithmGrammar {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)>;
+    fn next<'a>(&'a mut self) -> Option<MoveConfiguration<'a>>;
 }
 
 #[derive(Clone, Debug)]
 pub struct ListSearchType {
-    pub contains: Box<Vec<SearchType>>,
+    pub contains: Vec<SearchType>,
     curr: usize,
 }
 
 impl ListSearchType {
     pub fn new(contains: Vec<SearchType>) -> ListSearchType {
         ListSearchType {
-            contains: Box::new(contains),
+            contains,
             curr: 0,
         }
     }
 }
 
 impl AlgorithmGrammar for ListSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
+    fn next<'a>(&'a mut self) -> Option<MoveConfiguration<'a>> {
         if self.curr < self.contains.len() {
             let result = &mut self.contains[self.curr];
             if let Some(some) = result.next() {
@@ -45,19 +54,6 @@ impl AlgorithmGrammar for ListSearchType {
         }
     }
 }
-
-#[derive(Clone, Debug)]
-pub struct VisitedDedup(Box<SearchType>);
-impl AlgorithmGrammar for VisitedDedup {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
-        if let Some(result) = self.0.next() {
-            Some((result.0, result.1, false))
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct UnionSearchType {
     pub contains: Vec<(MoveFunction, String)>,
@@ -65,7 +61,7 @@ pub struct UnionSearchType {
 }
 
 impl AlgorithmGrammar for UnionSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
+    fn next(&mut self) -> Option<MoveConfiguration> {
         if !self.current {
             self.current = !self.current;
             return None;
@@ -108,7 +104,7 @@ pub struct RepeatSearchType {
 }
 
 impl AlgorithmGrammar for RepeatSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
+    fn next<'a>(&'a mut self) -> Option<MoveConfiguration<'a>> {
         if self.curr < self.count {
             if let Some(some) = self.contains.next() {
                 Some(some)
@@ -125,30 +121,46 @@ impl AlgorithmGrammar for RepeatSearchType {
 
 #[derive(Clone, Debug)]
 pub struct FunctionSearchType {
-    function: (MoveFunction, String, bool),
+    move_config: (MoveFunction, MoveOptions),
     contains: bool,
 }
+
 impl FunctionSearchType {
     pub fn new(func: MoveFunction, name: String) -> Self {
         FunctionSearchType {
-            function: (func, name, true),
+            move_config: (func,  MoveOptions {
+                name,
+                dedup: true,
+                verify_niceness: true
+
+            }),
             contains: true,
         }
     }
 }
 
 impl AlgorithmGrammar for FunctionSearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
+    fn next<'a>(&'a mut self) -> Option<MoveConfiguration<'a>> {
         self.contains = !self.contains;
         if self.contains {
             None
         } else {
             Some((
-                Box::new(self.function.0.clone()),
-                self.function.1.clone(),
-                self.function.2,
+                Box::new(self.move_config.0.clone()),
+                &self.move_config.1
             ))
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IgnoreNiceness(Box<SearchType>);
+
+impl AlgorithmGrammar for IgnoreNiceness {
+    fn next(&mut self) -> Option<MoveConfiguration> {
+        let x = self.0.next();
+        x.;
+        return x;
     }
 }
 
@@ -158,17 +170,17 @@ pub enum SearchType {
     Repeat(RepeatSearchType),
     List(ListSearchType),
     Union(UnionSearchType),
-    VisitedDedup(VisitedDedup),
+    IgnoreNiceness(IgnoreNiceness)
 }
 
 impl AlgorithmGrammar for SearchType {
-    fn next(&mut self) -> Option<(DynamicMoveFunction, String, bool)> {
+    fn next(&mut self) -> Option<MoveConfiguration> {
         match self {
             SearchType::Function(f) => f.next(),
             SearchType::Repeat(f) => f.next(),
             SearchType::List(f) => f.next(),
             SearchType::Union(f) => f.next(),
-            SearchType::VisitedDedup(f) => f.next(),
+            SearchType::IgnoreNiceness(f) => f.next(),
         }
     }
 }
@@ -205,7 +217,7 @@ impl KnotFinder {
     }
 }
 
-pub fn stab_search(depth: i32) -> KnotFinder {
+pub fn stab_commute_search(depth: i32) -> KnotFinder {
     KnotFinder(SearchType::List(ListSearchType::new(vec![
         SearchType::Function(FunctionSearchType::new(knot_stab, String::from("stab"))),
         SearchType::Repeat(RepeatSearchType {
@@ -297,6 +309,12 @@ fn parse_parens(tokens: &mut Peekable<std::vec::IntoIter<String>>) -> Option<Sea
         let result = parse_expr(tokens);
         assert_eq!(tokens.next(), Some(")".to_string()));
         return result;
+    }
+
+    if consume_if_equals(tokens, ":") {
+        let result = parse_expr(tokens);
+        assert_eq!(tokens.next(), Some(":".to_string()));
+        return result.map(|a| SearchType::IgnoreNiceness(IgnoreNiceness { contains: Box::new(a)}));
     }
 
     // deduplicate
