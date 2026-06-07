@@ -75,6 +75,8 @@ pub enum Dir {
 pub type Permutation = Vec<usize>;
 pub type WindingMatrix = Vec<Vec<i32>>;
 
+/// --- Function translated into rust from the griddiagrams. More info in README.md ---
+///     https://github.com/paulitzlinger/griddiagrams
 pub fn gridnotation_to_gridlist(mut gridnotation: GridNotation) -> GridList {
     if gridnotation.len() == 0 {
         panic!("Grid notation cannot be empty");

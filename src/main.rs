@@ -77,6 +77,7 @@ struct Args {
     verbose_output: bool,
 }
 
+/// The format in which an ongoing search for a nice grid diagram should be printed to the terminal
 pub enum LoggingType {
     None,
     Single,
@@ -235,6 +236,8 @@ fn main() {
     }
 }
 
+/// Following a series of searches, calculuates the totals of all possible `[KnotResult]` values.  
+/// `results` - all of the results from the searches that have just been accomplished.
 fn compute_analytics(results: &Vec<KnotResult>) {
     println!("========= Analytics =========");
     let total_length = results.len();
@@ -294,6 +297,12 @@ fn compute_analytics(results: &Vec<KnotResult>) {
     );
 }
 
+/// Converts the results into json, and saves them to a file. Only stores a record stating
+/// either that there exists a nice diagram, or the error that caused a nice diagram to not
+/// be found. This does not store what the diagram actually is, the path to get to the diagram
+/// or any other values.
+/// `file_name` - the file to which the results should be saved
+/// `results` - the results that should be saved
 fn save_results(file_name: String, results: &Vec<KnotResult>) {
     let mut map: HashMap<String, String> = HashMap::new();
     for result in results {
@@ -328,6 +337,8 @@ fn save_results(file_name: String, results: &Vec<KnotResult>) {
     let _ = fs::write(file_name, &serde_json::to_string_pretty(&map).unwrap());
 }
 
+/// Obtains a list of knot names that have not been solved, based on an output file
+/// Used to attempt to solve only the knots that do not yet have a solution.
 fn get_rest_from_results(file_name: String) -> Vec<String> {
     let json_string = serde_json::from_str::<serde_json::Map<_, _>>(
         str::from_utf8(&fs::read(file_name).unwrap()).unwrap(),
@@ -346,6 +357,11 @@ fn get_rest_from_results(file_name: String) -> Vec<String> {
     return keys;
 }
 
+/// Converts the results into json, and saves them to a file. Similar to the `[save_results]`
+/// function, but stores various important values in the case of a success: startingvertlist, ending
+/// vertlist, the series of moves necessary to get from the start to the end. 
+/// `file_name` - the file to which the results should be saved
+/// `results` - the results that should be saved
 #[allow(dead_code)]
 fn save_results_verbose(file_name: String, results: &Vec<KnotResult>) {
     let mut map: HashMap<String, serde_json::Value> = HashMap::new();

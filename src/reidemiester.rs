@@ -4,7 +4,7 @@ use std::cmp::max;
 use std::cmp::min;
 
 /// The direction of stabilization.
-/// For instance, this is NW stab on a ✗:
+/// For instance, this is NW stab on a ✗ as the north west cell is empty following the stabilization:
 /// ✗   ->  ·✗
 ///         ✗○
 pub enum StabDir {
@@ -48,6 +48,9 @@ impl StabDir {
     }
 }
 
+/// Generalizes all movements between adjacent rows/columns (the only two moves being switch and
+/// commute). This function only operates on the provided segments; it does not rotate the
+/// grid diagram.
 pub fn adj_elementwise_move_on_predicate(
     input_list: &DirList,
     preciate: impl Fn((i32, i32), (i32, i32)) -> bool,
@@ -73,7 +76,7 @@ pub fn adj_elementwise_move_on_predicate(
         }
     }
 
-    // Try wrap-around comparison
+    // Try wrap-around comparison. (the grid diagram exists on a torus, not a plane)
     let index = input_list.0.len() - 1;
     if preciate(input_list.0[0], input_list.0[index]) {
         let mut swapped_list = input_list.clone();
@@ -91,6 +94,9 @@ pub fn adj_elementwise_move_on_predicate(
     result
 }
 
+/// Generalizes all movements between adjacent rows/columns (the only two moves being switch and
+/// commute). This function rotates the `vertlist` in order to try the predicate on all rows and
+/// columns.
 pub fn knot_column_and_row_predicate_move(
     vertlist: &DirList,
     predicate: impl Fn((i32, i32), (i32, i32)) -> bool + 'static,
@@ -106,18 +112,38 @@ pub fn knot_column_and_row_predicate_move(
     h_to_v_commutations
 }
 
+/// Computes all possible switches for all orientations of the dirlist (both vertical
+/// segments and horizontal segments)
+/// `dirlist` - the grid diagram upon which the move will be accomplished.
+/// return: `Vec<(DirList, String)>` - a list of the results of the move, each element in the list
+/// containing the resulting dirlist in addition to a string representation of the move.
 pub fn knot_switch(vertlist: &DirList) -> Vec<(DirList, String)> {
     knot_column_and_row_predicate_move(vertlist, can_switch, String::from("switch"))
 }
 
+/// Computes all possible commutations for all orientations of the dirlist (both vertical
+/// segments and horizontal segments)
+/// `dirlist` - the grid diagram upon which the move will be accomplished.
+/// return: `Vec<(DirList, String)>` - a list of the results of the move, each element in the list
+/// containing the resulting dirlist in addition to a string representation of the move.
 pub fn knot_commute(vertlist: &DirList) -> Vec<(DirList, String)> {
     knot_column_and_row_predicate_move(vertlist, can_commute, String::from("commute"))
 }
 
+/// Epsilon represents the 'do nothing' move.
+/// `dirlist` - the grid diagram upon which the move (no effect) will be accomplished.
+/// return: `Vec<(DirList, String)>` - a list of the results of the move, each element in the list
+/// containing the resulting dirlist in addition to a string representation of the move. The list is
+/// guaranteed to have a length of 1, containing only the input `dirlist`.
 pub fn knot_epsilon(vertlist: &DirList) -> Vec<(DirList, String)> {
     vec![(vertlist.clone(), String::from("epsilon"))]
 }
 
+/// Computes all possible destabilizations for all orientations of the dirlist (both vertical
+/// segments and horizontal segments)
+/// `dirlist` - the grid diagram upon which the move will be accomplished.
+/// return: `Vec<(DirList, String)>` - a list of the results of the move, each element in the list
+/// containing the resulting dirlist in addition to a string representation of the move.
 pub fn knot_stab(input_list: &DirList) -> Vec<(DirList, String)> {
     let mut grid_stab_combos = vec![];
     for segment in input_list.0.clone() {
@@ -131,7 +157,7 @@ pub fn knot_stab(input_list: &DirList) -> Vec<(DirList, String)> {
         .collect()
 }
 
-/// Checks if two adjacent columns or rows can undergo the reidemeister move of commutation
+/// Checks if two adjacent columns or rows can undergo the reidemeister move called 'commutation'
 /// `t1` - the indicies of the x and o for the given slice of the dirlist.
 /// `t2` - the indicies of the x and o for the given slice of the dirlist.
 /// Note that `t1` and `t2` must be adjacent columns.
@@ -150,7 +176,7 @@ pub fn can_commute(t1: (i32, i32), t2: (i32, i32)) -> bool {
         || (max2 >= max1 && min2 <= min1)
 }
 
-/// Checks if two adjacent columns or rows can undergo the reidemeister move of switch
+/// Checks if two adjacent columns or rows can undergo the reidemeister move called 'switch'
 /// `t1` - the indicies of the x and o for the given slice of the dirlist.
 /// `t2` - the indicies of the x and o for the given slice of the dirlist.
 /// Note that `t1` and `t2` must be adjacent columns.
@@ -160,10 +186,14 @@ pub fn can_switch(t1: (i32, i32), t2: (i32, i32)) -> bool {
     (a == d) || (c == b)
 }
 
-/// Computes all possible destabilizations.
-pub fn knot_destab(vertlist: &DirList) -> Vec<(DirList, String)> {
-    let v_commutations = destab_move(vertlist);
-    let h_commutations = destab_move(&v_to_h(vertlist));
+/// Computes all possible destabilizations for all orientations of the dirlist (both vertical
+/// segments and horizontal segments)
+/// `dirlist` - the grid diagram upon which the move will be accomplished.
+/// return: `Vec<(DirList, String)>` - a list of the results of the move, each element in the list
+/// containing the resulting dirlist in addition to a string representation of the move.
+pub fn knot_destab(dirlist: &DirList) -> Vec<(DirList, String)> {
+    let v_commutations = destab_move(dirlist);
+    let h_commutations = destab_move(&v_to_h(dirlist));
     let mut h_to_v_commutations: Vec<(DirList, String)> = h_commutations
         .into_iter()
         .map(|a| tagged_v_to_h(&a))
@@ -174,6 +204,10 @@ pub fn knot_destab(vertlist: &DirList) -> Vec<(DirList, String)> {
     h_to_v_commutations
 }
 
+/// Computes all possible destabilizations for only vertical segments.
+/// `vertlist` - the vertlist upon which the move will be accomplished.
+/// return: `Vec<(DirList, String)>` - a list of the results of the move, each element in the list
+/// containing the resulting dirlist in addition to a string representation of the move.
 fn destab_move(vertlist: &DirList) -> Vec<(DirList, String)> {
     let mut result = vec![];
 
@@ -208,10 +242,29 @@ fn destab_move(vertlist: &DirList) -> Vec<(DirList, String)> {
 /// Checks if a column or row can be destabilized.
 fn can_destab((x, o): (i32, i32)) -> bool {
     // Interestingly, adjacency of the x and o values is the only check necessary for this
-    // otherwise complicated operation
+    // otherwise complicated operation. This is because it would be possible to repeatedly
+    // commute the row/column upon which the pair are placed until they reach a third element,
+    // at which point a triangle shape will be created and a destabilization can be accomplished
+    //
+    //   adjacent x and o identified
+    //   |          commutations can always be performed
+    //   |          |          destabilization can now be performed
+    //   |          |          |         the result
+    //   v          v          v         |
+    //   ○··✗      ·○·✗      ··○✗        v
+    //   ✗···  ->  ·✗··  ->  ··✗·  ->  ··○
+
     (x - o).abs() == 1
 }
 
+/// Takes in a vertlist and stabilization parameters, returning the resulting grid diagram after stabilization
+/// `vertlist` - the grid diagram to be operated upon
+/// `loc` - the indices of the x and o of the vertical segment to be operated upon. Note, this
+/// element will be unique due to the definition for a grid diagram
+/// `direction` - the direction in which the stabilization will occur
+/// `tuple_index` - either `0` or `1`, representing having either x or o as the center of the
+/// stabilization. Note, the vertical segment has already been selected by `loc`, leaving two
+/// options for the center of stabilization.
 pub fn stabilize(
     vertlist: DirList,
     loc: (i32, i32),
