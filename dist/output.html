@@ -1,0 +1,109 @@
+<!DOCTYPE html><html><head>
+	<style>body {
+  background-color: #000;
+  margin: 0;
+}
+
+.box > * {
+  background-color: #608ba833;
+  border: 2px solid #608ba8;
+  border-radius: 5px;
+}
+
+.box {
+  border: 2px dotted #608ba8;
+  display: flex;
+}
+</style>
+
+	<script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
+</head>
+
+<body>
+	<div id="3d-graph"></div>
+
+
+	<script>const highlightNodes = new Set();
+const highlightLinks = new Set();
+let hoverNode = null;
+// Random tree
+const N = 300;
+const gData = {
+    nodes: [
+        ...Array(N).keys()
+    ].map((i)=>({
+            id: i
+        })),
+    links: [
+        ...Array(N).keys()
+    ].filter((id)=>id).map((id)=>({
+            source: id,
+            target: Math.round(Math.random() * (id - 1))
+        }))
+};
+gData.links.forEach((link)=>{
+    const a = gData.nodes[link.source];
+    const b = gData.nodes[link.target];
+    !a.neighbors && (a.neighbors = []);
+    !b.neighbors && (b.neighbors = []);
+    a.neighbors.push(b);
+    b.neighbors.push(a);
+    !a.links && (a.links = []);
+    !b.links && (b.links = []);
+    a.links.push(link);
+    b.links.push(link);
+});
+const Graph = new ForceGraph3D(document.getElementById('3d-graph')).cooldownTicks(100).graphData(gData).nodeColor((node)=>highlightNodes.has(node) ? node === hoverNode ? 'rgb(255,0,0,1)' : 'rgba(255,160,0,0.8)' : 'rgba(0,255,255,0.6)').linkWidth((link)=>highlightLinks.has(link) ? 4 : 1).linkDirectionalParticles((link)=>highlightLinks.has(link) ? 4 : 0).linkDirectionalParticleWidth(4).onNodeHover((node)=>{
+    // no state change
+    if (!node && !highlightNodes.size || node && hoverNode === node) return;
+    highlightNodes.clear();
+    highlightLinks.clear();
+    if (node) {
+        highlightNodes.add(node);
+        node.neighbors.forEach((neighbor)=>highlightNodes.add(neighbor));
+        node.links.forEach((link)=>highlightLinks.add(link));
+    }
+    hoverNode = node || null;
+    updateHighlight();
+}).onLinkHover((link)=>{
+    highlightNodes.clear();
+    highlightLinks.clear();
+    if (link) {
+        highlightLinks.add(link);
+        highlightNodes.add(link.source);
+        highlightNodes.add(link.target);
+    }
+    updateHighlight();
+});
+function updateHighlight() {
+    // trigger update of highlighted objects in scene
+    Graph.nodeColor(Graph.nodeColor()).linkWidth(Graph.linkWidth()).linkDirectionalParticles(Graph.linkDirectionalParticles());
+}
+// fit to canvas when engine stops
+// Graph.enableNodeDrag(false)
+// Graph.onEngineStop(() => Graph.zoomToFit(400));
+Graph.onNodeClick = function() {
+    alert("test");
+};
+graphWidth = .5;
+graphHeight = 1;
+backgroundColor = "000000";
+resize = function(event) {
+    Graph.width(window.innerWidth * graphWidth);
+    Graph.height(window.innerHeight * graphHeight);
+};
+window.addEventListener('resize', resize, true);
+resize();
+
+</script>
+	<!--
+		<label id="drop-zone">
+		Drop images here, or click to upload.
+		<input type="file" id="file-input" multiple accept="image/*" />
+		</label>
+		<ul id="preview"></ul>
+		<button id="clear-btn">Clear</button>
+	-->
+
+
+<script src="/output.0672b153.js"></script></body></html>

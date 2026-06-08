@@ -1,6 +1,6 @@
 # 🪢 griddiagrams-rs 🪢
 `griddiagrams-rs` is a significantly improved, rust-based implementation of [griddiagrams](https://github.com/paulitzlinger/griddiagrams) using on the findings of the [accompanying paper](https://arxiv.org/abs/2602.02642).
-This tool is used to find "nice" griddiagrams of fibered knots. It has been used to build on the findings of `griddiagrams` by finding nice diagrams of 12 previously unsolved knots: 12n79, 12n168, 13n282, 13n917, 13n1279, 13n1281, 13n1413, 13n1826, 13n2915, 13n3089, 13n3904, 13n3932
+This tool is used to find "nice" griddiagrams of fibered knots. It has been used to build on the findings of griddiagrams in many ways including by finding nice diagrams of 12 previously unsolved knots: `12n79`, `12n168`, `13n282`, `13n917`, `13n1279`, `13n1281`, `13n1413`, `13n1826`, `13n2915`, `13n3089`, `13n3904`, `13n3932`.
 While the majority of this project is wholly original code, `knot_core.rs` is primarily a rust translation of `griddiagram`'s `core.py`; some comments have been copied verbatim. All of the functions that have been translated from the `griddiagrams` repository, are explicitly referred to as such in the comments that precede them.
 
 Main improvements:

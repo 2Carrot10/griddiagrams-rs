@@ -160,6 +160,7 @@ fn main() {
     let mut results = vec![];
 
     let knot_finder = match args.algorithm.as_str() {
+        // Both of these defaults are from the original griddiagrams repository
         "stab" | "stabilize" => stab_commute_search(args.depth),
         "commute" => commute_search(args.depth),
         filename => read_to_knot_finder(filename.to_string()),
