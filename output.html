@@ -2,6 +2,38 @@
 <head>
 	<style>
 
+
+.container {
+  display: flex;
+  background-color: DodgerBlue;
+}
+.container .text {
+  background-color: #f1f1f1;
+  flex: auto;
+	text-align: center;
+/*
+  margin: 10px;
+  padding: 20px;
+  */
+  font-size: 24px;
+}
+		#\33 d-graph {
+
+			resize: horizontal;
+			width: fit-content;
+			border: 2px solid rgb(96 139 168);
+			border-radius: 7px;
+			background-color: rgb(96, 139, 168, 0.2);
+		}
+		div.a {
+
+			resize: horizontal;
+			width: fit-content;
+			border: 2px solid rgb(96 139 168);
+			border-radius: 7px;
+			background-color: rgb(96, 139, 168, 0.2);
+		}
+
 		body { margin: 0; background-color: black } /* no scroll bar */
 
 		   .box > * {
@@ -20,7 +52,11 @@
 </head>
 
 <body>
+	<div class="container">
 	<div id="3d-graph"></div>
+	<div class="text"><p>test</p></div>
+	<div>
+
 
 
 	<script>
