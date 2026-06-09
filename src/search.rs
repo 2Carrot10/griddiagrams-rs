@@ -110,6 +110,7 @@ pub fn manual_gridstate_finder(
     let mut i = 0;
 
     while let Some((knot_finding_function, move_name, dedup)) = knot_finder.next() {
+        // ctrlc::set_handler(move || ());
         previous_frontier_size = current_states.len();
         if let Some(max_knots) = max_knots {
             if previous_frontier_size as i32 > max_knots {

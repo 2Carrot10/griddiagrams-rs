@@ -29,15 +29,15 @@ setCurrentLink = function(from, to) {
 	document.getElementById("selection-text").innerText = from + "->"+ to;
 }
 
-		const gData = {
-			nodes: [...Array(N).keys()].map(i => ({ id: i })),
-			links: [...Array(N - 2).keys()]
-			.filter(id => id)
-			.map(id => ({
-				source: id,
-				target: ((id) % (N)) + 1
-			}))
-		};
+const gData = {
+	nodes: [...Array(N).keys()].map(i => ({ id: i })),
+	links: [...Array(N - 2).keys()]
+	.filter(id => id)
+	.map(id => ({
+		source: id,
+		target: ((id) % (N)) + 1
+	}))
+};
 
 gData.links.forEach(link => {
 	const a = gData.nodes[link.source];
@@ -55,30 +55,30 @@ gData.links.forEach(link => {
 
 
 
-	addHighlightLinkNeighbors = function(link) {
-		if (link) {
-			highlightLinks.add(link);
-			highlightNodes.add(link.source);
-			highlightNodes.add(link.target);
-		}
+addHighlightLinkNeighbors = function(link) {
+	if (link) {
+		highlightLinks.add(link);
+		highlightNodes.add(link.source);
+		highlightNodes.add(link.target);
+	}
 
-	};
-	addHighlightNodeNeighbors = function(node) {
-		if (node) {
-			highlightNodes.add(node);
-			node.neighbors.forEach(neighbor => highlightNodes.add(neighbor));
-			node.links.forEach(link => highlightLinks.add(link));
-		}
+};
+addHighlightNodeNeighbors = function(node) {
+	if (node) {
+		highlightNodes.add(node);
+		node.neighbors.forEach(neighbor => highlightNodes.add(neighbor));
+		node.links.forEach(link => highlightLinks.add(link));
+	}
 
-	};
+};
 
 const Graph = new ForceGraph3D(document.getElementById('3d-graph'))
 	.cooldownTicks(100)
 	.graphData(gData)
 	.nodeColor(node => highlightNodes.has(node) ? node === hoverNode || node === clickNode ? 'rgb(255,0,0,1)' : 'rgba(255,160,0,0.8)' : 'rgba(0,255,255,0.6)')
 	.linkWidth(link => highlightLinks.has(link) ? 4 : 1)
-	// .linkDirectionalParticles(link => highlightLinks.has(link) ? 4 : 0)
-	// .linkDirectionalParticleWidth(4)
+// .linkDirectionalParticles(link => highlightLinks.has(link) ? 4 : 0)
+// .linkDirectionalParticleWidth(4)
 	.onNodeHover( node => {
 		// no state change
 		if ((!node && !highlightNodes.size) || (node && hoverNode === node)) return;
@@ -98,13 +98,11 @@ const Graph = new ForceGraph3D(document.getElementById('3d-graph'))
 		setCurrentLink(link.source.id, link.target.id);
 		updateHighlight();
 	})
-	.onNodeClick( node => {
-
+	.onNodeClick(node => {
 		clickNode = node || null;
 		clickLink = null;
-		putList(node.neighbors.map(x => x.id), "next-nodes")
+		putNextNodes(node.neighbors.map(x => x.id))
 
-		console.log(node);
 		setCurrentNode(node.id);
 		updateHighlight();
 	});
@@ -183,24 +181,24 @@ OAt = function(x, y, rotate) {
 }
 
 drawLine = function(startX, startY, endX, endY, rotate) {
-if (rotate) {
-	[startX, startY] = [startY, startX];
-	[endX, endY] = [endY, endX];
-}
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 14;
+	if (rotate) {
+		[startX, startY] = [startY, startX];
+		[endX, endY] = [endY, endX];
+	}
+	ctx.strokeStyle = "white";
+	ctx.lineWidth = 14;
 
-  ctx.beginPath();
-  ctx.moveTo(startX * canvas.width, startY * canvas.height);
-  ctx.lineTo(endX * canvas.width, endY * canvas.height);
-  ctx.stroke();
+	ctx.beginPath();
+	ctx.moveTo(startX * canvas.width, startY * canvas.height);
+	ctx.lineTo(endX * canvas.width, endY * canvas.height);
+	ctx.stroke();
 
-  ctx.beginPath();
-  ctx.strokeStyle = "black";
-  ctx.lineWidth = 6;
-  ctx.moveTo(startX * canvas.width, startY * canvas.height);
-  ctx.lineTo(endX * canvas.width, endY * canvas.height);
-  ctx.stroke();
+	ctx.beginPath();
+	ctx.strokeStyle = "black";
+	ctx.lineWidth = 6;
+	ctx.moveTo(startX * canvas.width, startY * canvas.height);
+	ctx.lineTo(endX * canvas.width, endY * canvas.height);
+	ctx.stroke();
 }
 
 trasitionCanvasWithVlist = function(vlist1, vlist2, delta, rotate) {
@@ -258,22 +256,22 @@ setCanvasWithVlist(currentVlist);
 trasitionCanvasWithVlist(currentVlist, nextVlist, .01, true);
 
 function goFullScreen(){
-    var canvas = document.getElementById("canvas");
-    if(canvas.requestFullScreen)
-        canvas.requestFullScreen();
-    else if(canvas.webkitRequestFullScreen)
-        canvas.webkitRequestFullScreen();
-    else if(canvas.mozRequestFullScreen)
-        canvas.mozRequestFullScreen();
+	var canvas = document.getElementById("canvas");
+	if(canvas.requestFullScreen)
+		canvas.requestFullScreen();
+	else if(canvas.webkitRequestFullScreen)
+		canvas.webkitRequestFullScreen();
+	else if(canvas.mozRequestFullScreen)
+		canvas.mozRequestFullScreen();
 }
 
 
-function putList(contents, elementId) {
-  document.getElementById(elementId).innerHTML = contents.map((x) => {
-    return `<li>${ x }</li>`;
-  }).join('');
-  
-  // Alternative using arrow function expression:
-  // document.getElementById('list').innerHTML = persons.map(person => `<li>${ getFullName(person) }</li>`).join('');
-  
+function putNextNodes(contents) {
+	document.getElementById("next-nodes").innerHTML = contents.map((x) => {
+		return `<li><button class="button">${ x } </button> </li>`;
+	}).join('');
+
+	// Alternative using arrow function expression:
+	// document.getElementById('list').innerHTML = persons.map(person => `<li>${ getFullName(person) }</li>`).join('');
+
 }

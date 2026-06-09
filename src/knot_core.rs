@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, mem};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -611,4 +611,9 @@ pub fn vlist_to_xo(vertlist: DirList) -> (Vec<IndexSize>, Vec<IndexSize>) {
     let o = tempo.iter().map(|x| n - x).collect();
 
     return (x, o);
+}
+
+
+pub fn estimate_size(dirlist_length: usize) -> usize {
+    24 + (dirlist_length * mem::size_of::<IndexSize>() * 2)
 }
