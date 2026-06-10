@@ -853,6 +853,18 @@ function setCurrentVlist(vlist) {
     currentVlist = vlist;
     redraw();
 }
+function dirlistToGridNotation(gridlist) {
+    gridNotation = [];
+    for(let i = 0; i < gridlist.length; i++){
+        let newSegment = [
+            ...Array(gridlist.length)
+        ];
+        newSegment[gridlist[i][0]] = "x";
+        newSegment[gridlist[i][1]] = "o";
+        gridNotation.push(newSegment);
+    }
+    return gridNotation;
+}
 
 },{"@parcel/transformer-js/src/esmodule-helpers.js":"kuaZ8","./griddiagram.js":"cd5a2"}]},["gFFkj","iQ2SZ"], "iQ2SZ", "parcelRequire94c2", {})
 
