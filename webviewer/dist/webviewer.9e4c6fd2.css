@@ -1,0 +1,185 @@
+.container {
+  display: flex;
+}
+
+.container .information-section {
+  color: #fff;
+  flex-direction: column;
+  flex: auto;
+  justify-content: start;
+  height: 100vh;
+  font-size: 18px;
+  display: flex;
+  overflow-y: auto;
+}
+
+.container .information-section > div {
+  min-height: 100vh;
+}
+
+div#next-elements {
+  text-align: center;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+}
+
+div#next-elements > div {
+  color: #0b2027;
+  background-color: #70a9a1;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 90%;
+  padding: 10px;
+  display: flex;
+}
+
+div#next-elements > div > div {
+  text-align: left;
+  flex: 1 1 0;
+  padding: 4px;
+}
+
+#\33 d-graph {
+  resize: horizontal;
+  width: fit-content;
+}
+
+canvas#canvas {
+  background-color: #fff;
+}
+
+div#selection div {
+  color: #0b2027;
+  text-align: center;
+  background-color: #f6f1d1;
+  justify-content: space-between;
+  align-items: center;
+  width: 60%;
+  margin: 20px;
+  padding: 5px;
+  display: flex;
+}
+
+div#selection {
+  text-align: center;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+}
+
+div.alert {
+  background-color: #787878cc;
+  width: 100vw;
+  height: 100vh;
+  margin: auto;
+  position: absolute;
+  inset: 0;
+}
+
+div.alert div {
+  color: #000;
+  background-color: #40798c;
+  border: 10px solid #f6f1d1;
+  width: fit-content;
+  height: fit-content;
+  margin: auto;
+  position: absolute;
+  inset: 0;
+}
+
+body {
+  background-color: #0b2027;
+  margin: 0;
+}
+
+.box > * {
+  background-color: #608ba833;
+  border: 2px solid #608ba8;
+  border-radius: 5px;
+}
+
+.box {
+  border: 2px dotted #608ba8;
+  display: flex;
+}
+
+* {
+  font-family: Garamond, serif;
+}
+
+#drop-zone {
+  color: #0b2027;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  justify-content: center;
+  align-items: center;
+  width: 500px;
+  max-width: 100%;
+  height: 200px;
+  padding: 1em;
+  display: flex;
+}
+
+.fullscreen-button > svg {
+  width: 25px;
+  height: 25px;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.fullscreen-button {
+  background: none;
+  border: none;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#file-input {
+  display: none;
+}
+
+#preview {
+  flex-direction: column;
+  gap: .5em;
+  width: 500px;
+  max-width: 100%;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+#preview li {
+  align-items: center;
+  gap: .5em;
+  width: 100%;
+  height: 100px;
+  margin: 0;
+  display: flex;
+}
+
+#preview img {
+  object-fit: cover;
+  width: 100px;
+  height: 100px;
+}
+
+.invisible-button {
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  outline: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+}
+/*# sourceMappingURL=webviewer.9e4c6fd2.css.map */
