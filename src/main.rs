@@ -72,9 +72,13 @@ struct Args {
     #[arg(long)]
     hide_diagrams: bool,
 
-    /// store nice diagram instead of just weather or not it exists
+    /// store nice diagram instead of just whether or not it exists
     #[arg(long)]
     verbose_output: bool,
+
+    /// only return nice diagrams if they are the same size as the input diagram
+    #[arg(long)]
+    small_only: bool,
 }
 
 /// The format in which an ongoing search for a nice grid diagram should be printed to the terminal
@@ -153,7 +157,9 @@ fn main() {
     let mut results = vec![];
 
     let knot_finder = match args.algorithm.as_str() {
-        "stab" | "stabilize" => stab_search(args.depth),
+        "stab" | "stabilize" => { if args.small_only {
+            panic!("Stabilize search will not return small diagrams")
+        } stab_search(args.depth)},
         "commute" => commute_search(args.depth),
         filename => read_to_knot_finder(filename.to_string()),
     };
@@ -172,7 +178,8 @@ fn main() {
             HashSet::from([vertlist.clone()]),
             &logging_type,
             knot_finder.clone(),
-            args.max_knots
+            args.max_knots,
+            args.small_only
         );
         if matches!(logging_type, LoggingType::Single) {
             println!();

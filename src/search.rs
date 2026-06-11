@@ -96,6 +96,7 @@ pub fn manual_gridstate_finder(
     logging: &LoggingType,
     mut knot_finder: KnotFinder,
     max_knots: Option<i32>,
+    small_only: bool
 ) -> Result<SearchRecord, SearchFailure> {
     let do_logging = !matches!(logging, LoggingType::None);
     let single_line = matches!(logging, LoggingType::Single);
@@ -126,8 +127,11 @@ pub fn manual_gridstate_finder(
         {
             // Find a path from the starting state to the nice diagram
             let path = reconstruct_path(&visited_states, dirlist.clone());
-            record.path = Some(path);
-            return Ok(record);
+            if !small_only || path.iter().filter(|s| s.contains("stabilize")).count() <= path.iter().filter(|s| s.contains("Destab")).count()
+            {
+                record.path = Some(path);
+                return Ok(record);
+            }
         }
 
         if dedup {
