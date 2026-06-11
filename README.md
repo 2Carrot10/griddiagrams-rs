@@ -38,7 +38,7 @@ Options:
   -n, --depth <DEPTH>              [default: 200]
   -t, --threads <THREADS>          Will default to the number of cores available on the system
       --hide-diagrams
-      --verbose-output             store nice diagram instead of just weather or not it exists
+      --verbose-output             store nice diagram instead of just whether or not it exists
   -h, --help                       Print help
   -V, --version                    Print version
 ```
@@ -115,7 +115,7 @@ Found nice knot for 12n_79, #0: [(0, 2), (9, 4), (1, 8), (6, 12), (10, 0), (11, 
 ···│·╰─────╯│
 ···╰────────╯
 ```
-To search all knots using just commutations, logging only weather or not they have succeeded:
+To search all knots using just commutations, logging only whether or not they have succeeded:
 ```sh
 ./griddiagrams --knots all --algorithm commute --logging none -o output/out.json 
 ```
